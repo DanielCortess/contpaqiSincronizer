@@ -1,0 +1,47 @@
+Contexto proyecto sincronizacion
+
+El proyecto de sincronizacion es un servicio que debe ser completamente construido en Python.
+
+Objetivo general:
+- Sincronizar datos entre un sistema llamado Netvy y un sistema llamado Contpaq, en ambas direcciones segun el contexto.
+
+Alcance inicial de sincronizacion:
+- Clientes: sincronizacion en ambas direcciones.
+- Articulos: sincronizacion en ambas direcciones.
+- Pedidos de venta: sincronizacion solo de Netvy hacia Contpaq.
+
+Operaciones que deben contemplarse en cada contexto:
+- Creacion.
+- Actualizacion.
+- Borrado.
+
+Componentes del proyecto:
+
+1. API Netvy
+- Fuente de consulta de datos.
+- Desde aqui se obtendra la informacion para determinar que registros se deben crear, actualizar y borrar en Contpaq.
+
+2. Sincronizador
+- Servicio encargado de orquestar toda la sincronizacion.
+
+3. SDK/DLL
+- Fuente de consulta de datos del lado de Contpaq.
+- Desde aqui se obtendra la informacion para determinar que registros se deben crear, actualizar y borrar en Netvy.
+
+4. Tabla intermedia SQLite (Sincronizados)
+- Almacenara los registros sincronizados.
+- Servira para conservar historial de sincronizacion.
+
+5. Tabla intermedia 2 SQLite (Fechas)
+- Almacenara registros relacionados con fechas de sincronizacion.
+- Servira para conservar historial de sincronizacion.
+
+Notas de trabajo a partir de este punto:
+- Este archivo sera la base de contexto del proyecto.
+- A partir de ahora se ira alimentando con nueva informacion conforme se defina la estructura del sistema.
+- No se inicia desarrollo de codigo todavia; primero se consolidara el contexto y el diseno del proyecto.
+
+Contexto de despliegue e integracion:
+- El sincronizador correra en el servidor donde esta instalado Contpaq.
+- Contpaq es un ERP de escritorio que opera sobre maquinas Windows.
+- Netvy es un ERP web que se encuentra en un servidor diferente.
