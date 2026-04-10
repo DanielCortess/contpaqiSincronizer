@@ -1,0 +1,32 @@
+import json
+import sys
+import unittest
+from pathlib import Path
+
+
+SRC_PATH = Path(__file__).resolve().parents[1]
+
+if str(SRC_PATH) not in sys.path:
+	sys.path.insert(0, str(SRC_PATH))
+
+from INF.SQLLiteRepository import SQLLiteRepository
+
+
+class test(unittest.TestCase):
+	def testSQLLiteINIT(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		sql_lite_config = config["SQLLITE"]
+		db_absolute_path = (SRC_PATH / sql_lite_config["DBPATH"]).resolve()
+
+		repository = SQLLiteRepository(sql_lite_config)
+		repository.init()
+
+		self.assertTrue(db_absolute_path.exists())
+
+
+if __name__ == "__main__":
+	unittest.main()

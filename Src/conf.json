@@ -1,0 +1,16 @@
+{
+    "NETVY":{
+        "URLBASE":"http://www.netvy.com",
+        "USER":"netvy",
+        "PASSWORD":"netvy",
+        "LICENSE":"netvy"
+    },
+    "SQLLITE":{
+        "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"
+    },
+    "CONTPAQ":{
+        "PATH":"C:/Program Files (x86)/CONTPAQ i/CONTPAQ i Contabilidad",
+        "USER":"contpaq",
+        "PASSWORD":"contpaq"
+    }
+}
