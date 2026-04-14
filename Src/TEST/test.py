@@ -9,7 +9,9 @@ SRC_PATH = Path(__file__).resolve().parents[1]
 if str(SRC_PATH) not in sys.path:
 	sys.path.insert(0, str(SRC_PATH))
 
+from APP import init
 from INF.SQLLiteRepository import SQLLiteRepository
+from INF.ApiNetvyRepository import ApiNetvyRepository
 
 
 class test(unittest.TestCase):
@@ -26,6 +28,31 @@ class test(unittest.TestCase):
 		repository.init()
 
 		self.assertTrue(db_absolute_path.exists())
+
+	def testLogin(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		result = repository.login()
+
+		self.assertIsNotNone(result.token)
+		self.assertIsNotNone(result.refreshToken)
+
+	def testRefreshToken(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		token = repository.login()
+		repository.refresh_token(token)
+
+		self.assertIsNotNone(token.token)
+		self.assertIsNotNone(token.refreshToken)
 
 
 if __name__ == "__main__":

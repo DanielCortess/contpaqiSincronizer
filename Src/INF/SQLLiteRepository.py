@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 
+from APP import init
+
 
 class SQLLiteRepository:
 	

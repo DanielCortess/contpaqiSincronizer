@@ -1,9 +1,9 @@
 {
     "NETVY":{
-        "URLBASE":"http://www.netvy.com",
-        "USER":"netvy",
-        "PASSWORD":"netvy",
-        "LICENSE":"netvy"
+        "URLBASE":"localhost:8030",
+        "USER":"DEMO",
+        "PASSWORD":"DEMO",
+        "LICENSE":"PEREIRANA"
     },
     "SQLLITE":{
         "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"
