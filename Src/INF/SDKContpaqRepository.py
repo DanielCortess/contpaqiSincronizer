@@ -166,7 +166,9 @@ class SDKContpaqRepository:
 				timestamp = result[0]
 				# Si el timestamp es datetime lo retornamos, si es string lo convertimos
 				if isinstance(timestamp, str):
-					return datetime.fromisoformat(timestamp)
+					# El formato es 'MM/DD/YYYY HH:MM:SS:fff', convertir a 'MM/DD/YYYY HH:MM:SS.fff'
+					timestamp = timestamp.rsplit(':', 1)[0] + '.' + timestamp.rsplit(':', 1)[1]
+					return datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S.%f')
 				return timestamp
 			else:
 				return fecha_desde
@@ -306,7 +308,9 @@ class SDKContpaqRepository:
 				timestamp = result[0]
 				# Si el timestamp es datetime lo retornamos, si es string lo convertimos
 				if isinstance(timestamp, str):
-					return datetime.fromisoformat(timestamp)
+					# El formato es 'MM/DD/YYYY HH:MM:SS:fff', convertir a 'MM/DD/YYYY HH:MM:SS.fff'
+					timestamp = timestamp.rsplit(':', 1)[0] + '.' + timestamp.rsplit(':', 1)[1]
+					return datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S.%f')
 				return timestamp
 			else:
 				return fecha_desde

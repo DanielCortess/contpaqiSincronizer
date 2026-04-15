@@ -13,10 +13,10 @@
         "USER":"SUPERVISOR",
         "PASSWORD":"",
         "EMPRESA_ID": 2,
-        "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
+        "NOMBRE_PAQ":"CONTPAQI",
         "DRIVER":"{SQL Server}",
-        "SERVER":"localhost",
-        "DATABASE":"contpaq",
+        "SERVER":"ONYX\\CONTPAQI",
+        "DATABASE":"adPRUEBAS",
         "Trusted_Connection":"yes"
     }
 }
