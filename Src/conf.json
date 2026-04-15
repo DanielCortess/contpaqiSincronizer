@@ -9,8 +9,14 @@
         "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"
     },
     "CONTPAQ":{
-        "PATH":"C:/Program Files (x86)/CONTPAQ i/CONTPAQ i Contabilidad",
-        "USER":"contpaq",
-        "PASSWORD":"contpaq"
+        "PATH":"C:/Program Files (x86)/CONTPAQ i/CONTPAQ i Comercial",
+        "USER":"SUPERVISOR",
+        "PASSWORD":"",
+        "EMPRESA_ID": 2,
+        "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
+        "DRIVER":"{SQL Server}",
+        "SERVER":"localhost",
+        "DATABASE":"contpaq",
+        "Trusted_Connection":"yes"
     }
 }
