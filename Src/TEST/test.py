@@ -78,7 +78,18 @@ class test(unittest.TestCase):
 
 		self.assertIsNotNone(result)
 
+	def testGetPedidoVentaCabecera(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		result = repository.getPedidoVentaCabecera("19990101")
+
+		self.assertIsNotNone(result)
+
 
 if __name__ == "__main__":
-	tester = test()
-	tester.testGetArticles()
+	unittest.main()

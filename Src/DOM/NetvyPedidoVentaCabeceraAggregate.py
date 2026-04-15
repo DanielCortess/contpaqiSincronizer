@@ -1,0 +1,50 @@
+class NetvyPedidoVentaCabeceraAggregate:
+	def __init__(
+		self,
+		PedidoVentaCabeceraID=None,
+		CustomerID=None,
+		EmpresaID=None,
+		FechaHoraUsuario=None,
+		SeriePedidoID=None,
+		Numero=None,
+		Fecha=None,
+		ReferenciaCliente=None,
+		ClienteID=None,
+		NotaGeneral=None,
+		NotaCliente=None,
+		PedidoPor=None,
+		FechaEntregaPrevistaInterna=None,
+		FechaEntregaPrevistaCliente=None,
+		ContactoID=None,
+		MonedaID=None,
+		Entregado=None,
+		Descripcion=None,
+		ReferenciaNuestra=None,
+		PesoNeto=None,
+		PesoBruto=None,
+		Cajas=None,
+		Palets=None,
+	):
+		self.PedidoVentaCabeceraID = PedidoVentaCabeceraID
+		self.CustomerID = CustomerID
+		self.EmpresaID = EmpresaID
+		self.FechaHoraUsuario = FechaHoraUsuario
+		self.SeriePedidoID = SeriePedidoID
+		self.Numero = Numero
+		self.Fecha = Fecha
+		self.ReferenciaCliente = ReferenciaCliente
+		self.ClienteID = ClienteID
+		self.NotaGeneral = NotaGeneral
+		self.NotaCliente = NotaCliente
+		self.PedidoPor = PedidoPor
+		self.FechaEntregaPrevistaInterna = FechaEntregaPrevistaInterna
+		self.FechaEntregaPrevistaCliente = FechaEntregaPrevistaCliente
+		self.ContactoID = ContactoID
+		self.MonedaID = MonedaID
+		self.Entregado = Entregado
+		self.Descripcion = Descripcion
+		self.ReferenciaNuestra = ReferenciaNuestra
+		self.PesoNeto = PesoNeto
+		self.PesoBruto = PesoBruto
+		self.Cajas = Cajas
+		self.Palets = Palets
