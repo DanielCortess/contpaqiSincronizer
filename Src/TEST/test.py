@@ -54,6 +54,31 @@ class test(unittest.TestCase):
 		self.assertIsNotNone(token.token)
 		self.assertIsNotNone(token.refreshToken)
 
+	def testGetArticles(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		result = repository.getArticles("19990101")
+
+		self.assertIsNotNone(result)
+
+	def testGetMailings(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		result = repository.getMailings("19990101")
+
+		self.assertIsNotNone(result)
+
 
 if __name__ == "__main__":
-	unittest.main()
+	tester = test()
+	tester.testGetArticles()
