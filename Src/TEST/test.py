@@ -19,6 +19,7 @@ from DOM.NetvyArticuloAggregate import NetvyArticuloAggregate
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
 from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
 from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
+from DOM.ContpaqPedidoVentaLineaAggregate import ContpaqPedidoVentaLineaAggregate
 from APP.SyncContpaqController import SyncContpaqController
 
 
@@ -70,7 +71,7 @@ class test(unittest.TestCase):
 
 		repository = ApiNetvyRepository(config["NETVY"])
 		repository.login()
-		result = repository.getArticles("19990101")
+		result = repository.getArticles("19990101000000")
 
 		self.assertIsNotNone(result)
 
@@ -82,7 +83,7 @@ class test(unittest.TestCase):
 
 		repository = ApiNetvyRepository(config["NETVY"])
 		repository.login()
-		result = repository.getMailings("19990101")
+		result = repository.getMailings("19990101000000")
 
 		self.assertIsNotNone(result)
 
@@ -94,7 +95,19 @@ class test(unittest.TestCase):
 
 		repository = ApiNetvyRepository(config["NETVY"])
 		repository.login()
-		result = repository.getPedidoVentaCabecera("19990101")
+		result = repository.getPedidoVentaCabecera("19990101000000")
+
+		self.assertIsNotNone(result)
+
+	def testGetPedidoVentaLinea(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		result = repository.getSalesOrderLine("19990101000000")
 
 		self.assertIsNotNone(result)
 
@@ -290,30 +303,56 @@ class test(unittest.TestCase):
 		repository = SDKContpaqRepository(config["CONTPAQ"])
 
 		pedido = ContpaqPedidoVentaCabeceraAggregate(
-			CIDMOVIMIENTO=None,
 			CIDDOCUMENTO=None,
-			CNUMEROMOVIMIENTO=None,
 			CIDDOCUMENTODE=None,
-			CIDPRODUCTO=None,
 			CCODIGOCONCEPTO="2",
 			CCODIGOCTEPROV="12345",
-			CCODIGOPRODUCTO="12345P",
-			CUNIDADES=1.0,
-			CPRECIO=100.0,
 			CREFERENCIA="TEST-SDK-PEDIDO",
 		)
 
-		doc_id, mov_id = repository.createSalesOrderHeader(pedido)
+		doc_id = repository.createSalesOrderHeader(pedido)
 
 		self.assertIsNotNone(doc_id)
 		self.assertIsInstance(doc_id, int)
 		self.assertGreater(doc_id, 0)
 		self.assertEqual(pedido.CIDDOCUMENTO, doc_id)
 
+	def testSDKContpaqCreateSalesOrderLine(self):
+		"""Test createSalesOrderLine crea un movimiento en un pedido de venta existente"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = SDKContpaqRepository(config["CONTPAQ"])
+
+		pedido = ContpaqPedidoVentaCabeceraAggregate(
+			CIDDOCUMENTO=None,
+			CIDDOCUMENTODE=None,
+			CCODIGOCONCEPTO="2",
+			CCODIGOCTEPROV="12345",
+			CREFERENCIA="TEST-SDK-PEDIDO-LINEA",
+		)
+
+		doc_id = repository.createSalesOrderHeader(pedido)
+
+		linea = ContpaqPedidoVentaLineaAggregate(
+			CIDMOVIMIENTO=None,
+			CNUMEROMOVIMIENTO=None,
+			CIDDOCUMENTO=doc_id,
+			CIDPRODUCTO=None,
+			CCODIGOPRODUCTO="12345P",
+			CUNIDADES=1.0,
+			CPRECIO=100.0,
+			CREFERENCIA="TEST-SDK-PEDIDO-LINEA",
+		)
+
+		mov_id = repository.createSalesOrderLine(linea)
+
 		self.assertIsNotNone(mov_id)
 		self.assertIsInstance(mov_id, int)
 		self.assertGreater(mov_id, 0)
-		self.assertEqual(pedido.CIDMOVIMIENTO, mov_id)
+		self.assertEqual(linea.CIDMOVIMIENTO, mov_id)
 
 	def testRun(self):
 		config_path = SRC_PATH / "conf.json"

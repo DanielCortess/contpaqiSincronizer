@@ -23,6 +23,9 @@ class NetvyMailingAggregate:
 		Longitud=None,
 		NombreComercial=None,
 		Notas=None,
+		TipoDocumentoID=None,
+		TipoPersonaID=None,
+
 	):
 		self.MailingID = MailingID
 		self.EmpresaID = EmpresaID
@@ -46,3 +49,5 @@ class NetvyMailingAggregate:
 		self.Longitud = Longitud
 		self.NombreComercial = NombreComercial
 		self.Notas = Notas
+		self.TipoDocumentoID = TipoDocumentoID
+		self.TipoPersonaID = TipoPersonaID

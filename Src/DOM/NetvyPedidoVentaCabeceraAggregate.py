@@ -24,6 +24,7 @@ class NetvyPedidoVentaCabeceraAggregate:
 		PesoBruto=None,
 		Cajas=None,
 		Palets=None,
+		Codigo=None,
 	):
 		self.PedidoVentaCabeceraID = PedidoVentaCabeceraID
 		self.CustomerID = CustomerID
@@ -48,3 +49,4 @@ class NetvyPedidoVentaCabeceraAggregate:
 		self.PesoBruto = PesoBruto
 		self.Cajas = Cajas
 		self.Palets = Palets
+		self.Codigo = Codigo

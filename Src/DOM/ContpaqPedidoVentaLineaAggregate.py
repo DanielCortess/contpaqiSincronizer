@@ -1,0 +1,26 @@
+class ContpaqPedidoVentaLineaAggregate:
+
+	def __init__(
+		self,
+		CIDMOVIMIENTO,
+		CNUMEROMOVIMIENTO,
+		CIDDOCUMENTO,
+		CIDPRODUCTO,
+		CCODIGOPRODUCTO,
+		CUNIDADES,
+		CPRECIO,
+		CCODALMACEN="1",
+		CREFERENCIA="",
+	):
+		# Campos de salida asignados por el SDK al crear
+		self.CIDMOVIMIENTO = CIDMOVIMIENTO
+		self.CNUMEROMOVIMIENTO = CNUMEROMOVIMIENTO
+		self.CIDDOCUMENTO = CIDDOCUMENTO
+		self.CIDPRODUCTO = CIDPRODUCTO
+
+		# Campos necesarios para crear el movimiento en Contpaqi
+		self.CCODIGOPRODUCTO = CCODIGOPRODUCTO
+		self.CUNIDADES = CUNIDADES
+		self.CPRECIO = CPRECIO
+		self.CCODALMACEN = CCODALMACEN
+		self.CREFERENCIA = CREFERENCIA

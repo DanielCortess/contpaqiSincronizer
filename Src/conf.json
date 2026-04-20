@@ -8,7 +8,9 @@
         "PASSWORD":"Netvy2026",
         "LICENSE":"NETVY-TEST-LOCAL",
         "CODIGOFAMILIA":"FAMGE",
-        "CODIGOMONEDA":"MXN"
+        "CODIGOMONEDA":"MXN",
+        "TIPODOCUMENTO":"MX_CERTIFICATE",
+        "TIPOPERSONAMEX":"Fisica"
     },
     "SQLLITE":{
         "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"

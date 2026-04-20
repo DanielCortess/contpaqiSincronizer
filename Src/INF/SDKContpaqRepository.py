@@ -8,6 +8,7 @@ from DOM.ContpaqArticuloCollection import ContpaqArticuloCollection
 from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
 from DOM.ContpaqMailingCollection import ContpaqMailingCollection
 from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
+from DOM.ContpaqPedidoVentaLineaAggregate import ContpaqPedidoVentaLineaAggregate
 
 
 # Traducción del struct tProducto de C# (LayoutKind.Sequential, CharSet.Ansi, Pack=4)
@@ -717,20 +718,16 @@ class SDKContpaqRepository:
 
 	def createSalesOrderHeader(self, pedido):
 		"""
-		Crea un pedido de venta en Contpaqi usando el SDK nativo.
-		Internamente ejecuta dos pasos:
-		  1. fAltaDocumento  → crea el encabezado del documento (CIDDOCUMENTO)
-		  2. fAltaMovimiento → agrega el movimiento/renglón al documento (CIDMOVIMIENTO)
+		Crea el documento de un pedido de venta en Contpaqi usando el SDK nativo.
 
 		Args:
 			pedido (ContpaqPedidoVentaCabeceraAggregate): Aggregate con los datos
-				de entrada (CCODIGOCONCEPTO, CCODIGOCTEPROV, CCODIGOPRODUCTO,
-				CUNIDADES, CPRECIO, CFECHA, CSERIE, CFOLIO, CNUMMONEDA,
-				CTIPOCAMBIO, CREFERENCIA, CCODALMACEN).
+				de entrada del documento (CCODIGOCONCEPTO, CCODIGOCTEPROV,
+				CFECHA, CSERIE, CFOLIO, CNUMMONEDA, CTIPOCAMBIO,
+				CREFERENCIA).
 
 		Returns:
-			tuple[int, int]: (CIDDOCUMENTO, CIDMOVIMIENTO) — IDs generados.
-			También actualiza los campos del aggregate.
+			int: CIDDOCUMENTO generado. También actualiza el aggregate.
 
 		Raises:
 			Exception: Si el SDK devuelve un código de error distinto de 0.
@@ -775,25 +772,77 @@ class SDKContpaqRepository:
 				msg = self._leer_error_sdk(sdk, result)
 				raise Exception(f"Error fAltaDocumento al crear pedido: código {result} — {msg}")
 
-			# Paso 2: Agregar el movimiento (renglón) al documento
+			pedido.CIDDOCUMENTO    = nuevo_doc_id.value
+
+			return nuevo_doc_id.value
+		finally:
+			self._cerrar_sdk(sdk, cwd)
+
+	def createSalesOrderLine(self, linea):
+		"""
+		Crea un movimiento de pedido de venta en un documento existente.
+
+		Args:
+			linea (ContpaqPedidoVentaLineaAggregate): Aggregate con los datos
+				de entrada del movimiento (CIDDOCUMENTO, CCODIGOPRODUCTO,
+				CUNIDADES, CPRECIO, CCODALMACEN, CREFERENCIA).
+
+		Returns:
+			int: CIDMOVIMIENTO generado. También actualiza el aggregate.
+
+		Raises:
+			Exception: Si el SDK devuelve un código de error distinto de 0.
+		"""
+		sdk, cwd = self._iniciar_sdk()
+		try:
+			if linea.CIDDOCUMENTO is None:
+				raise ValueError("CIDDOCUMENTO es obligatorio para crear el movimiento")
+			if not linea.CCODIGOPRODUCTO:
+				raise ValueError("CCODIGOPRODUCTO es obligatorio para crear el movimiento")
+			codigo_producto = str(linea.CCODIGOPRODUCTO).strip()
+			if not codigo_producto:
+				raise ValueError("CCODIGOPRODUCTO es obligatorio para crear el movimiento")
+
+			sdk.fBuscarIdDocumento.restype = c_int
+			sdk.fBuscarIdDocumento.argtypes = [c_int]
+			sdk.fBuscaProducto.restype = c_int
+			sdk.fBuscaProducto.argtypes = [ctypes.c_char_p]
+
+			sdk.fAltaMovimiento.restype = c_int
+			sdk.fAltaMovimiento.argtypes = [
+				c_int,
+				ctypes.POINTER(c_int),
+				ctypes.POINTER(tMovimiento),
+			]
+
+			# Posicionar y validar documento para evitar alta sobre IDs inválidos.
+			res_doc = sdk.fBuscarIdDocumento(int(linea.CIDDOCUMENTO))
+			if res_doc != 0:
+				msg = self._leer_error_sdk(sdk, res_doc)
+				raise Exception(f"Documento no válido para crear movimiento (CIDDOCUMENTO={linea.CIDDOCUMENTO}): código {res_doc} — {msg}")
+
+			# Validar que el producto exista antes de insertar el movimiento.
+			res_prod = sdk.fBuscaProducto(codigo_producto.encode("latin-1"))
+			if res_prod != 0:
+				msg = self._leer_error_sdk(sdk, res_prod)
+				raise Exception(f"Producto no válido para crear movimiento (CCODIGOPRODUCTO={codigo_producto}): código {res_prod} — {msg}")
+
 			mov = tMovimiento()
-			mov.aCodProdSer  = pedido.CCODIGOPRODUCTO[:30].encode("latin-1")
-			mov.aUnidades    = pedido.CUNIDADES
-			mov.aPrecio      = pedido.CPRECIO
-			mov.aCodAlmacen  = (pedido.CCODALMACEN or "1")[:30].encode("latin-1")
-			mov.aReferencia  = (pedido.CREFERENCIA or "")[:20].encode("latin-1")
+			mov.aCodProdSer = codigo_producto[:30].encode("latin-1")
+			mov.aUnidades = float(linea.CUNIDADES or 0.0)
+			mov.aPrecio = float(linea.CPRECIO or 0.0)
+			mov.aCodAlmacen = (linea.CCODALMACEN or "1")[:30].encode("latin-1")
+			mov.aReferencia = (linea.CREFERENCIA or "")[:20].encode("latin-1")
 
 			nuevo_mov_id = c_int(0)
-			result = sdk.fAltaMovimiento(nuevo_doc_id, byref(nuevo_mov_id), byref(mov))
+			result = sdk.fAltaMovimiento(int(linea.CIDDOCUMENTO), byref(nuevo_mov_id), byref(mov))
 			if result != 0:
 				msg = self._leer_error_sdk(sdk, result)
 				raise Exception(f"Error fAltaMovimiento al crear renglón: código {result} — {msg}")
 
-			# Actualizar el aggregate con los IDs generados
-			pedido.CIDDOCUMENTO    = nuevo_doc_id.value
-			pedido.CIDMOVIMIENTO   = nuevo_mov_id.value
-			pedido.CNUMEROMOVIMIENTO = 1
+			linea.CIDMOVIMIENTO = nuevo_mov_id.value
+			linea.CNUMEROMOVIMIENTO = 1
 
-			return nuevo_doc_id.value, nuevo_mov_id.value
+			return nuevo_mov_id.value
 		finally:
 			self._cerrar_sdk(sdk, cwd)

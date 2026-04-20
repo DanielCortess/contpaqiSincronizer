@@ -10,6 +10,7 @@ from INF.SDKContpaqRepository import SDKContpaqRepository
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
 from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
 from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
+from DOM.ContpaqPedidoVentaLineaAggregate import ContpaqPedidoVentaLineaAggregate
 from DOM.NetvyArticuloAggregate import NetvyArticuloAggregate
 from DOM.NetvyMailingAggregate import NetvyMailingAggregate
 
@@ -29,15 +30,19 @@ class SyncContpaqController:
 		self.fecha_mailing_netvy                 = None
 		self.fecha_articulo_netvy                = None
 		self.fecha_pedido_venta_cabecera_netvy   = None
+		self.fecha_pedido_venta_linea_netvy      = None
 		self.fecha_mailing_contpaq               = None
 		self.fecha_articulo_contpaq              = None
 		self.fecha_pedido_venta_cabecera_contpaq = None
+		self.fecha_pedido_venta_linea_contpaq    = None
 
 	def init(self):
 		# 1. Cargar variables globales de Netvy (FamiliaID, MonedaID, token)
 		self._netvy.login()
 		self._netvy.getFamilyConfig()
 		self._netvy.getCurrencieConfig()
+		self._netvy.getConfigTipoDocumentoID()
+		self._netvy.getConfigTipoPersonaID()
 
 		# 2. Inicializar SQLite (crea el archivo y las tablas si no existen)
 		self._sqllite.init()
@@ -51,7 +56,11 @@ class SyncContpaqController:
 			setattr(self, attr, valor)
 
 	def run(self):
-		self.init()
+		try:
+			self.init()
+		except Exception as ex:
+			self._log_error(f"Error crítico en init, el sincronizador no puede arrancar: {ex}")
+			return
 		while True:
 			self._sincronizar()
 			time.sleep(self._interval)
@@ -69,6 +78,7 @@ class SyncContpaqController:
 		articulos_netvy = None
 		mailings_netvy  = None
 		pedidos_netvy   = None
+		lineas_netvy    = None
 
 		try:
 			articulos_netvy = self._netvy.getArticles(self.fecha_articulo_netvy)
@@ -84,6 +94,11 @@ class SyncContpaqController:
 			pedidos_netvy = self._netvy.getPedidoVentaCabecera(self.fecha_pedido_venta_cabecera_netvy)
 		except Exception as ex:
 			self._log_error(f"getPedidoVentaCabecera Netvy falló: {ex}")
+
+		try:
+			lineas_netvy = self._netvy.getSalesOrderLine(self.fecha_pedido_venta_linea_netvy)
+		except Exception as ex:
+			self._log_error(f"getSalesOrderLine Netvy falló: {ex}")
 
 		# 2. Crear artículos en Contpaq
 		if articulos_netvy:
@@ -127,7 +142,7 @@ class SyncContpaqController:
 						f"(codigo={netvy_mail.ReferenciaCodigo}): {ex}"
 					)
 
-		# 4. Crear pedidos de venta en Contpaq
+		# 4. Crear cabeceras de pedido de venta en Contpaq
 		if pedidos_netvy:
 			for netvy_ped in pedidos_netvy.creacion:
 				if netvy_ped.PedidoVentaCabeceraID is None:
@@ -136,16 +151,10 @@ class SyncContpaqController:
 					continue
 				try:
 					contpaq_ped = ContpaqPedidoVentaCabeceraAggregate(
-						CIDMOVIMIENTO=None,
 						CIDDOCUMENTO=None,
-						CNUMEROMOVIMIENTO=None,
 						CIDDOCUMENTODE=None,
-						CIDPRODUCTO=None,
 						CCODIGOCONCEPTO="2",        # TODO: mapear desde config cuando esté disponible
-						CCODIGOCTEPROV="12345",     # TODO: reemplazar cuando Netvy exponga el código
-						CCODIGOPRODUCTO="12345P",   # TODO: reemplazar cuando las líneas del pedido estén disponibles
-						CUNIDADES=1.0,
-						CPRECIO=0.0,
+						CCODIGOCTEPROV=netvy_ped.Codigo or "",
 						CREFERENCIA=netvy_ped.ReferenciaNuestra or "",
 					)
 					self._contpaq.createSalesOrderHeader(contpaq_ped)
@@ -154,6 +163,35 @@ class SyncContpaqController:
 					self._log_error(
 						f"createSalesOrderHeader Contpaq falló "
 						f"(referencia={netvy_ped.ReferenciaNuestra}): {ex}"
+					)
+
+		# 5. Crear líneas de pedido de venta en Contpaq
+		if lineas_netvy:
+			for netvy_linea in lineas_netvy.creacion:
+				if netvy_linea.PedidoVentaLineaID is None:
+					continue
+				if self._sqllite.existe_sincronizacion_por_netvy_id("PedidoVentaLinea", netvy_linea.PedidoVentaLineaID):
+					continue
+				cid_documento = self._sqllite.get_contpaq_id_por_netvy_id("PedidoVentaCabecera", netvy_linea.PedidoVentaCabeceraID)
+				if cid_documento is None:
+					continue
+				try:
+					contpaq_linea = ContpaqPedidoVentaLineaAggregate(
+						CIDMOVIMIENTO=None,
+						CNUMEROMOVIMIENTO=None,
+						CIDDOCUMENTO=cid_documento,
+						CIDPRODUCTO=None,
+						CCODIGOPRODUCTO=netvy_linea.Codigo or "",
+						CUNIDADES=netvy_linea.Cantidad or 0.0,
+						CPRECIO=netvy_linea.PrecioVenta or 0.0,
+						CREFERENCIA=netvy_linea.Referencia or "",
+					)
+					self._contpaq.createSalesOrderLine(contpaq_linea)
+					self._sqllite.crear_sincronizacion("PedidoVentaLinea", netvy_linea.PedidoVentaLineaID, contpaq_linea.CIDMOVIMIENTO, self.fecha_pedido_venta_linea_netvy)
+				except Exception as ex:
+					self._log_error(
+						f"createSalesOrderLine Contpaq falló "
+						f"(lineaID={netvy_linea.PedidoVentaLineaID}): {ex}"
 					)
 
 		# 5. Actualizar fechas de sincronización
@@ -180,6 +218,14 @@ class SyncContpaqController:
 				self.fecha_pedido_venta_cabecera_netvy = fecha
 			except Exception as ex:
 				self._log_error(f"actualizar_fecha_sincronizacion PedidoVentaCabecera/Netvy falló: {ex}")
+
+		if lineas_netvy and lineas_netvy.fechaHoraHasta:
+			try:
+				fecha = self._normalizar_fecha(lineas_netvy.fechaHoraHasta)
+				self._sqllite.actualizar_fecha_sincronizacion("PedidoVentaLinea", "Netvy", fecha)
+				self.fecha_pedido_venta_linea_netvy = fecha
+			except Exception as ex:
+				self._log_error(f"actualizar_fecha_sincronizacion PedidoVentaLinea/Netvy falló: {ex}")
 
 	def _normalizar_fecha(self, fecha):
 		"""Convierte cualquier formato de fecha a YYYYMMDDHHMMSSСCC (17 chars) para uso consistente."""
@@ -264,6 +310,8 @@ class SyncContpaqController:
 						ReferenciaCodigo=contpaq_mail.CCODIGOCLIENTE,
 						Nombre=contpaq_mail.CRAZONSOCIAL,
 						Cif=contpaq_mail.CRFC,
+						TipoDocumentoID=init.NetvyTipoDocumentoID,
+						TipoPersonaID=init.NetvyTipoPersonaID,
 					)
 					self._netvy.createMailing(netvy_mail)
 					self._sqllite.crear_sincronizacion("Mailing", netvy_mail.MailingID, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_contpaq)

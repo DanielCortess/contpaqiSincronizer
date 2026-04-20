@@ -8,6 +8,8 @@ from DOM.NetvyMailingAggregate import NetvyMailingAggregate
 from DOM.NetvyMailingCollection import NetvyMailingCollection
 from DOM.NetvyPedidoVentaCabeceraAggregate import NetvyPedidoVentaCabeceraAggregate
 from DOM.NetvyPedidoVentaCabeceraCollection import NetvyPedidoVentaCabeceraCollection
+from DOM.NetvyPedidoVentaLineaAggregate import NetvyPedidoVentaLineaAggregate
+from DOM.NetvyPedidoVentaLineaCollection import NetvyPedidoVentaLineaCollection
 
 
 class ApiNetvyRepository:
@@ -24,6 +26,8 @@ class ApiNetvyRepository:
 		self.license = config.get("LICENSE")
 		self.codigo_familia = config.get("CODIGOFAMILIA")
 		self.codigo_moneda = config.get("CODIGOMONEDA")
+		self.tipo_documento = config.get("TIPODOCUMENTO")
+		self.tipo_persona_mex = config.get("TIPOPERSONAMEX")
 
 		if not all([self.url_base, self.user, self.password, self.license]):
 			raise ValueError("config debe incluir las llaves URLBASE, USER, PASSWORD, LICENSE")
@@ -182,7 +186,7 @@ class ApiNetvyRepository:
 		)
 
 	def getPedidoVentaCabecera(self, fecha):
-		url = f"{self.url_base}/changeRegister/PedidoVentaCabecera/{fecha}"
+		url = f"{self.url_base}/changeRegister/pedidoventacabecera/{fecha}"
 		headers = {
 			"Authorization": f"Bearer {init.token.token}",
 		}
@@ -237,6 +241,74 @@ class ApiNetvyRepository:
 			PesoBruto=data.get("PesoBruto"),
 			Cajas=data.get("Cajas"),
 			Palets=data.get("Palets"),
+			Codigo=data.get("Codigo"),
+		)
+
+	def getSalesOrderLine(self, fecha):
+		url = f"{self.url_base}/changeRegister/pedidoventalinea/{fecha}"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			error_data = response.json()
+			raise Exception(error_data.get("error", f"Error al obtener líneas de pedido de venta: {response.status_code}"))
+
+		data = response.json()
+		creacion = [self._map_pedido_venta_linea(item) for item in data.get("creacion", [])]
+		modificar = [self._map_pedido_venta_linea(item) for item in data.get("modificar", [])]
+		borrar = [self._map_pedido_venta_linea(item) for item in data.get("borrar", [])]
+
+		return NetvyPedidoVentaLineaCollection(
+			tabla=data.get("tabla"),
+			fechaHoraDesde=data.get("fechaHoraDesde"),
+			fechaHoraHasta=data.get("fechaHoraHasta"),
+			creacion=creacion,
+			modificar=modificar,
+			borrar=borrar,
+		)
+
+	def _map_pedido_venta_linea(self, data):
+		return NetvyPedidoVentaLineaAggregate(
+			PedidoVentaLineaID=data.get("PedidoVentaLineaID"),
+			CustomerID=data.get("CustomerID"),
+			EmpresaID=data.get("EmpresaID"),
+			UsuarioID=data.get("UsuarioID"),
+			FechaHoraUsuario=data.get("FechaHoraUsuario"),
+			Linea=data.get("Linea"),
+			TipoLinea=data.get("TipoLinea"),
+			ArticuloID=data.get("ArticuloID"),
+			Nombre=data.get("Nombre"),
+			Descripcion=data.get("Descripcion"),
+			Cantidad=data.get("Cantidad"),
+			PrecioVenta=data.get("PrecioVenta"),
+			Dto1=data.get("Dto1"),
+			Dto2=data.get("Dto2"),
+			Dto3=data.get("Dto3"),
+			ImporteVenta=data.get("ImporteVenta"),
+			PrecioCoste=data.get("PrecioCoste"),
+			Referencia=data.get("Referencia"),
+			NotaInterna=data.get("NotaInterna"),
+			NotaCliente=data.get("NotaCliente"),
+			PedidoVentaCabeceraID=data.get("PedidoVentaCabeceraID"),
+			FechaEntregaPrevistaCliente=data.get("FechaEntregaPrevistaCliente"),
+			FechaEntregaPrevistaInterna=data.get("FechaEntregaPrevistaInterna"),
+			CantidadOriginal=data.get("CantidadOriginal"),
+			CantidadEntregada=data.get("CantidadEntregada"),
+			Entregado=data.get("Entregado"),
+			PorcentajeIVA=data.get("PorcentajeIVA"),
+			PorcentajeRecargo=data.get("PorcentajeRecargo"),
+			OfertaLineaID=data.get("OfertaLineaID"),
+			FechaHoraModificado=data.get("FechaHoraModificado"),
+			Codigo=data.get("Codigo"),
+			CodigoAlternativo=data.get("CodigoAlternativo"),
 		)
 
 	def getFamilyConfig(self):
@@ -357,6 +429,66 @@ class ApiNetvyRepository:
 		init.NetvyMonedaID = moneda_id
 		return moneda_id
 
+	def getConfigTipoDocumentoID(self):
+		if not self.tipo_documento:
+			raise ValueError("TIPODOCUMENTO no está configurado en el archivo de configuración")
+
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		url = f"{self.url_base}/generaltypes?key=TIPODOCUMENTO&match={self.tipo_documento}"
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			raise Exception(f"Error al obtener TipoDocumentoID: {response.status_code}")
+
+		data = response.json()
+		if not isinstance(data, list) or len(data) == 0:
+			raise Exception(f"No se encontró TipoDocumento con clave TIPODOCUMENTO y valor '{self.tipo_documento}'")
+
+		tabla_general_id = data[0].get("TablaGeneralID")
+		if tabla_general_id is None:
+			raise Exception("TablaGeneralID no encontrado en la respuesta de TipoDocumento")
+
+		init.NetvyTipoDocumentoID = tabla_general_id
+		return tabla_general_id
+
+	def getConfigTipoPersonaID(self):
+		if not self.tipo_persona_mex:
+			raise ValueError("TIPOPERSONAMEX no está configurado en el archivo de configuración")
+
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		url = f"{self.url_base}/generaltypes?key=TIPOPERSONAMEX&match={self.tipo_persona_mex}"
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			raise Exception(f"Error al obtener TipoPersonaID: {response.status_code}")
+
+		data = response.json()
+		if not isinstance(data, list) or len(data) == 0:
+			raise Exception(f"No se encontró TipoPersona con clave TIPOPERSONAMEX y valor '{self.tipo_persona_mex}'")
+
+		tabla_general_id = data[0].get("TablaGeneralID")
+		if tabla_general_id is None:
+			raise Exception("TablaGeneralID no encontrado en la respuesta de TipoPersona")
+
+		init.NetvyTipoPersonaID = tabla_general_id
+		return tabla_general_id
+
 	def createMailing(self, mailing):
 		"""
 		Crea un nuevo mailing (cliente/proveedor) en la API de Netvy.
@@ -386,8 +518,14 @@ class ApiNetvyRepository:
 			"Telefono": mailing.Telefono or "",
 			"MonedaID": init.NetvyMonedaID,
 			"NombrePersona": mailing.Nombre or "",
-			"esCliente": False,
-			"Activo": 1
+			"TipoDocumentoID": mailing.TipoDocumentoID,
+			"TipoPersonaID": mailing.TipoPersonaID,
+			"esCliente": True,
+			"Activo": 1,
+			"cliente":
+			{
+				"ClienteID":""  
+			}
 		}
 
 		response = requests.post(url, json=body, headers=headers)

@@ -8,9 +8,11 @@ _REGISTROS_REQUERIDOS = [
 	{"Tabla": "Mailing",             "Programa": "Netvy"},
 	{"Tabla": "Articulo",            "Programa": "Netvy"},
 	{"Tabla": "PedidoVentaCabecera", "Programa": "Netvy"},
+	{"Tabla": "PedidoVentaLinea",    "Programa": "Netvy"},
 	{"Tabla": "Mailing",             "Programa": "Contpaq"},
 	{"Tabla": "Articulo",            "Programa": "Contpaq"},
 	{"Tabla": "PedidoVentaCabecera", "Programa": "Contpaq"},
+	{"Tabla": "PedidoVentaLinea",    "Programa": "Contpaq"},
 ]
 
 
@@ -152,7 +154,11 @@ class SQLLiteRepository:
 					(registro["Tabla"], registro["Programa"]),
 				)
 				row = cursor.fetchone()
-				tabla   = registro["Tabla"].lower().replace("pedidoventacabecera", "pedido_venta_cabecera")
+				tabla = (
+					registro["Tabla"].lower()
+					.replace("pedidoventacabecera", "pedido_venta_cabecera")
+					.replace("pedidoventalinea", "pedido_venta_linea")
+				)
 				programa = registro["Programa"].lower()
 				fechas[f"fecha_{tabla}_{programa}"] = row[0] if row else _FECHA_INICIAL
 		return fechas
@@ -183,6 +189,16 @@ class SQLLiteRepository:
 				(tabla, contpaq_id),
 			)
 			return cursor.fetchone() is not None
+
+	def get_contpaq_id_por_netvy_id(self, tabla, netvy_id):
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT ContpaqID FROM Sincronizacion "
+				"WHERE Tabla = ? AND NetvyID = ?",
+				(tabla, netvy_id),
+			)
+			row = cursor.fetchone()
+			return row[0] if row else None
 
 	def crear_sincronizacion(self, tabla, netvy_id, contpaq_id, fecha):
 		with self.get_connection() as conn:
