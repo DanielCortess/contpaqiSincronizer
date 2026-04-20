@@ -22,6 +22,8 @@ class ApiNetvyRepository:
 		self.user = config.get("USER")
 		self.password = config.get("PASSWORD")
 		self.license = config.get("LICENSE")
+		self.codigo_familia = config.get("CODIGOFAMILIA")
+		self.codigo_moneda = config.get("CODIGOMONEDA")
 
 		if not all([self.url_base, self.user, self.password, self.license]):
 			raise ValueError("config debe incluir las llaves URLBASE, USER, PASSWORD, LICENSE")
@@ -236,3 +238,223 @@ class ApiNetvyRepository:
 			Cajas=data.get("Cajas"),
 			Palets=data.get("Palets"),
 		)
+
+	def getFamilyConfig(self):
+		"""
+		Obtiene la configuración de familia desde la API de Netvy.
+		Primero intenta buscar por CODIGOFAMILIA, si no encuentra, busca sin filtro.
+		Si encuentra, guarda el FamiliaID en la variable global init.NetvyFamiliaID
+		"""
+		if not self.codigo_familia:
+			raise ValueError("CODIGOFAMILIA no está configurado en el archivo de configuración")
+
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		# Primer intento: con match de CODIGOFAMILIA
+		url = f"{self.url_base}/families?limit=1&orderby=FechaHoraUsuario&orientation=asc&match={self.codigo_familia}"
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			raise Exception(f"Error al obtener configuración de familia (primer intento): {response.status_code}")
+
+		data = response.json()
+
+		# Si la respuesta es un array vacío, reintentar sin el match
+		if isinstance(data, list) and len(data) == 0:
+			url = f"{self.url_base}/families?limit=1&orderby=FechaHoraUsuario&orientation=asc"
+			response = requests.get(url, headers=headers)
+
+			if response.status_code == 401:
+				self.refresh_token(init.token)
+				headers["Authorization"] = f"Bearer {init.token.token}"
+				response = requests.get(url, headers=headers)
+
+			if response.status_code != 200:
+				raise Exception(f"Error al obtener configuración de familia (segundo intento): {response.status_code}")
+
+			data = response.json()
+
+		# Si sigue siendo un array vacío, lanzar excepción
+		if isinstance(data, list) and len(data) == 0:
+			raise Exception("No se encontró configuración de familia en la API de Netvy")
+
+		# Extraer el primer elemento del array y obtener FamiliaID
+		if isinstance(data, list):
+			familia = data[0]
+		else:
+			familia = data
+
+		familia_id = familia.get("FamiliaID")
+		if familia_id is None:
+			raise Exception("FamiliaID no encontrado en la respuesta de la API")
+
+		init.NetvyFamiliaID = familia_id
+		return familia_id
+
+	def getCurrencieConfig(self):
+		"""
+		Obtiene la configuración de moneda desde la API de Netvy.
+		Primero intenta buscar por CODIGOMONEDA, si no encuentra, busca sin filtro.
+		Si encuentra, guarda el MonedaID en la variable global init.NetvyMonedaID
+		"""
+		if not self.codigo_moneda:
+			raise ValueError("CODIGOMONEDA no está configurado en el archivo de configuración")
+
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		# Primer intento: con codigoISO de CODIGOMONEDA
+		url = f"{self.url_base}/currencies?limit=1&orderby=FechaHoraUsuario&orientation=asc&codigoISO={self.codigo_moneda}"
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			raise Exception(f"Error al obtener configuración de moneda (primer intento): {response.status_code}")
+
+		data = response.json()
+
+		# Si la respuesta es un array vacío, reintentar sin el codigoISO
+		if isinstance(data, list) and len(data) == 0:
+			url = f"{self.url_base}/currencies?limit=1&orderby=FechaHoraUsuario&orientation=asc"
+			response = requests.get(url, headers=headers)
+
+			if response.status_code == 401:
+				self.refresh_token(init.token)
+				headers["Authorization"] = f"Bearer {init.token.token}"
+				response = requests.get(url, headers=headers)
+
+			if response.status_code != 200:
+				raise Exception(f"Error al obtener configuración de moneda (segundo intento): {response.status_code}")
+
+			data = response.json()
+
+		# Si sigue siendo un array vacío, lanzar excepción
+		if isinstance(data, list) and len(data) == 0:
+			raise Exception("No se encontró configuración de moneda en la API de Netvy")
+
+		# Extraer el primer elemento del array y obtener MonedaID
+		if isinstance(data, list):
+			moneda = data[0]
+		else:
+			moneda = data
+
+		moneda_id = moneda.get("MonedaID")
+		if moneda_id is None:
+			raise Exception("MonedaID no encontrado en la respuesta de la API")
+
+		init.NetvyMonedaID = moneda_id
+		return moneda_id
+
+	def createMailing(self, mailing):
+		"""
+		Crea un nuevo mailing (cliente/proveedor) en la API de Netvy.
+		
+		Args:
+			mailing (NetvyMailingAggregate): Aggregate del mailing a crear
+			
+		Returns:
+			int: MailingID del mailing creado
+		"""
+		if init.NetvyMonedaID is None:
+			raise ValueError("NetvyMonedaID no está configurado. Ejecute getCurrencieConfig() primero")
+
+		url = f"{self.url_base}/thirdparty"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"ReferenciaCodigo": mailing.ReferenciaCodigo or "",
+			"Cif": mailing.Cif or "",
+			"Nombre": mailing.Nombre or "",
+			"NombreComercial": mailing.NombreComercial or "",
+			"Email": mailing.Email or "",
+			"Web": mailing.Web or "",
+			"Fax": mailing.Fax or "",
+			"Telefono": mailing.Telefono or "",
+			"MonedaID": init.NetvyMonedaID,
+			"NombrePersona": mailing.Nombre or "",
+			"esCliente": False,
+			"Activo": 1
+		}
+
+		response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code != 201:
+			raise Exception(f"Error al crear mailing en la API: {response.status_code} - {response.text}")
+
+		data = response.json()
+		mailing_id = data.get("MailingID")
+
+		if mailing_id is None:
+			raise Exception("MailingID no encontrado en la respuesta de la API")
+
+		mailing.MailingID = mailing_id
+		return mailing_id
+
+	def createArticle(self, articulo):
+		"""
+		Crea un nuevo artículo en la API de Netvy.
+		
+		Args:
+			articulo (NetvyArticuloAggregate): Aggregate del artículo a crear
+			
+		Returns:
+			int: ArticuloID del artículo creado
+		"""
+		if init.NetvyFamiliaID is None:
+			raise ValueError("NetvyFamiliaID no está configurado. Ejecute getFamilyConfig() primero")
+
+		url = f"{self.url_base}/tables/articles"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"Activo": True,
+			"Codigo": articulo.Codigo or "",
+			"Nombre": articulo.Nombre or "",
+			"FamiliaID": init.NetvyFamiliaID,
+			"Descripcion": articulo.Descripcion or ""
+		}
+
+		response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code != 201:
+			raise Exception(f"Error al crear artículo en la API: {response.status_code} - {response.text}")
+
+		data = response.json()
+		articulo_data = data.get("articulo")
+
+		if articulo_data is None:
+			raise Exception("Respuesta de artículo no encontrada en la API")
+
+		articulo_id = articulo_data.get("ArticuloID")
+
+		if articulo_id is None:
+			raise Exception("ArticuloID no encontrado en la respuesta de la API")
+
+		articulo.ArticuloID = articulo_id
+		return articulo_id

@@ -3,6 +3,16 @@ from pathlib import Path
 
 from APP import init
 
+_FECHA_INICIAL = "19990101000000000"
+_REGISTROS_REQUERIDOS = [
+	{"Tabla": "Mailing",             "Programa": "Netvy"},
+	{"Tabla": "Articulo",            "Programa": "Netvy"},
+	{"Tabla": "PedidoVentaCabecera", "Programa": "Netvy"},
+	{"Tabla": "Mailing",             "Programa": "Contpaq"},
+	{"Tabla": "Articulo",            "Programa": "Contpaq"},
+	{"Tabla": "PedidoVentaCabecera", "Programa": "Contpaq"},
+]
+
 
 class SQLLiteRepository:
 	
@@ -115,3 +125,70 @@ class SQLLiteRepository:
 
 	def _normalize_sql(self, sql):
 		return " ".join(sql.strip().replace("\n", " ").split()).lower()
+
+	def asegurar_fechas_sincronizacion(self):
+		with self.get_connection() as conn:
+			for registro in _REGISTROS_REQUERIDOS:
+				cursor = conn.execute(
+					"SELECT FechaSincronizacionID FROM FechaSincronizacion "
+					"WHERE Tabla = ? AND Programa = ?",
+					(registro["Tabla"], registro["Programa"]),
+				)
+				if cursor.fetchone() is None:
+					conn.execute(
+						"INSERT INTO FechaSincronizacion (Tabla, FechaHora, Programa) "
+						"VALUES (?, ?, ?)",
+						(registro["Tabla"], _FECHA_INICIAL, registro["Programa"]),
+					)
+				conn.commit()
+
+	def get_fechas_sincronizacion(self):
+		fechas = {}
+		with self.get_connection() as conn:
+			for registro in _REGISTROS_REQUERIDOS:
+				cursor = conn.execute(
+					"SELECT FechaHora FROM FechaSincronizacion "
+					"WHERE Tabla = ? AND Programa = ?",
+					(registro["Tabla"], registro["Programa"]),
+				)
+				row = cursor.fetchone()
+				tabla   = registro["Tabla"].lower().replace("pedidoventacabecera", "pedido_venta_cabecera")
+				programa = registro["Programa"].lower()
+				fechas[f"fecha_{tabla}_{programa}"] = row[0] if row else _FECHA_INICIAL
+		return fechas
+
+	def actualizar_fecha_sincronizacion(self, tabla, programa, fecha):
+		with self.get_connection() as conn:
+			conn.execute(
+				"UPDATE FechaSincronizacion SET FechaHora = ? "
+				"WHERE Tabla = ? AND Programa = ?",
+				(fecha, tabla, programa),
+			)
+			conn.commit()
+
+	def existe_sincronizacion_por_netvy_id(self, tabla, netvy_id):
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT SincronizacionID FROM Sincronizacion "
+				"WHERE Tabla = ? AND NetvyID = ?",
+				(tabla, netvy_id),
+			)
+			return cursor.fetchone() is not None
+
+	def existe_sincronizacion_por_contpaq_id(self, tabla, contpaq_id):
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT SincronizacionID FROM Sincronizacion "
+				"WHERE Tabla = ? AND ContpaqID = ?",
+				(tabla, contpaq_id),
+			)
+			return cursor.fetchone() is not None
+
+	def crear_sincronizacion(self, tabla, netvy_id, contpaq_id, fecha):
+		with self.get_connection() as conn:
+			conn.execute(
+				"INSERT INTO Sincronizacion (Tabla, NetvyID, ContpaqID, FechaHoraUltimaSincronizacion) "
+				"VALUES (?, ?, ?, ?)",
+				(tabla, netvy_id, contpaq_id, fecha),
+			)
+			conn.commit()

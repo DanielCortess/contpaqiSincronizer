@@ -1,6 +1,7 @@
 import json
 import sys
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 
@@ -13,6 +14,12 @@ from APP import init
 from INF.SQLLiteRepository import SQLLiteRepository
 from INF.ApiNetvyRepository import ApiNetvyRepository
 from INF.SDKContpaqRepository import SDKContpaqRepository
+from DOM.NetvyMailingAggregate import NetvyMailingAggregate
+from DOM.NetvyArticuloAggregate import NetvyArticuloAggregate
+from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
+from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
+from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
+from APP.SyncContpaqController import SyncContpaqController
 
 
 class test(unittest.TestCase):
@@ -111,7 +118,7 @@ class test(unittest.TestCase):
 			config = json.load(config_file)
 
 		repository = SDKContpaqRepository(config["CONTPAQ"])
-		result = repository.getArticles("19990101")
+		result = repository.getArticles("19990101000000")
 
 		self.assertIsNotNone(result)
 		self.assertEqual(result.tabla, "dbo.admProductos")
@@ -127,7 +134,7 @@ class test(unittest.TestCase):
 			config = json.load(config_file)
 
 		repository = SDKContpaqRepository(config["CONTPAQ"])
-		result = repository.getMailings("19990101")
+		result = repository.getMailings("19990101000000")
 
 		self.assertIsNotNone(result)
 		self.assertEqual(result.tabla, "dbo.admClientes")
@@ -135,9 +142,189 @@ class test(unittest.TestCase):
 		self.assertIsNotNone(result.fechaHoraHasta)
 		self.assertIsInstance(result.creacion_modificar_borrar, list)
 
+	def testGetFamilyConfig(self):
+		"""Test getFamilyConfig obtiene la configuración de familia y la guarda en variable global"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		familia_id = repository.getFamilyConfig()
+
+		self.assertIsNotNone(familia_id)
+		self.assertEqual(init.NetvyFamiliaID, familia_id)
+		self.assertIsInstance(familia_id, int)
+
+	def testGetCurrencieConfig(self):
+		"""Test getCurrencieConfig obtiene la configuración de moneda y la guarda en variable global"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		moneda_id = repository.getCurrencieConfig()
+
+		self.assertIsNotNone(moneda_id)
+		self.assertEqual(init.NetvyMonedaID, moneda_id)
+		self.assertIsInstance(moneda_id, int)
+
+	def testCreateMailing(self):
+		"""Test createMailing crea un nuevo mailing en la API"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		repository.getCurrencieConfig()
+
+		# Crear un nuevo mailing de prueba
+		mailing = NetvyMailingAggregate(
+			ReferenciaCodigo="TEST_MAILING_002",
+			Cif="TEST_CIF_002",
+			Nombre="Cliente de Prueba",
+			NombreComercial="Cliente Prueba SA",
+			Email="test@example.com",
+			Web="http://example.com",
+			Fax="1234567890",
+			Telefono="9876543210"
+		)
+
+		mailing_id = repository.createMailing(mailing)
+
+		self.assertIsNotNone(mailing_id)
+		self.assertEqual(mailing.MailingID, mailing_id)
+		self.assertIsInstance(mailing_id, int)
+
+	def testCreateArticle(self):
+		"""Test createArticle crea un nuevo artículo en la API"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = ApiNetvyRepository(config["NETVY"])
+		repository.login()
+		repository.getFamilyConfig()
+
+		# Crear un nuevo artículo de prueba
+		articulo = NetvyArticuloAggregate(
+			Codigo="ARTICULO_TEST_002",
+			Nombre="Artículo de Prueba",
+			Descripcion="Descripción del artículo de prueba",
+			Activo=True
+		)
+
+		articulo_id = repository.createArticle(articulo)
+
+		self.assertIsNotNone(articulo_id)
+		self.assertEqual(articulo.ArticuloID, articulo_id)
+		self.assertIsInstance(articulo_id, int)
+
+	def testSDKContpaqCreateArticle(self):
+		"""Test createArticle crea un artículo en Contpaqi usando el SDK nativo"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = SDKContpaqRepository(config["CONTPAQ"])
+
+		codigo = f"TST_A_{datetime.now().strftime('%H%M%S')}"
+		articulo = ContpaqArticuloAggregate(
+			CIDPRODUCTO=None,
+			CCODIGOPRODUCTO=codigo,
+			CNOMBREPRODUCTO="Artículo SDK Prueba",
+			CTIPOPRODUCTO=1,
+			CFECHAALTAPRODUCTO=None,
+			CFECHABAJA=None,
+			CTIMESTAMP=None
+		)
+
+		nuevo_id = repository.createArticle(articulo)
+
+		self.assertIsNotNone(nuevo_id)
+		self.assertIsInstance(nuevo_id, int)
+		self.assertGreater(nuevo_id, 0)
+		self.assertEqual(articulo.CIDPRODUCTO, nuevo_id)
+
+	def testSDKContpaqCreateMailing(self):
+		"""Test createMailing crea un cliente en Contpaqi usando el SDK nativo"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = SDKContpaqRepository(config["CONTPAQ"])
+
+		codigo = f"TST_C_{datetime.now().strftime('%H%M%S')}"
+		mailing = ContpaqMailingAggregate(
+			CIDCLIENTEPROVEEDOR=None,
+			CCODIGOCLIENTE=codigo,
+			CRAZONSOCIAL="Cliente SDK Prueba SA",
+			CFECHAALTA=None,
+			CRFC="TSC010101AAA",
+			CTIMESTAMP=None
+		)
+
+		nuevo_id = repository.createMailing(mailing)
+
+		self.assertIsNotNone(nuevo_id)
+		self.assertIsInstance(nuevo_id, int)
+		self.assertGreater(nuevo_id, 0)
+		self.assertEqual(mailing.CIDCLIENTEPROVEEDOR, nuevo_id)
+
+
+	def testSDKContpaqCreateSalesOrderHeader(self):
+		"""Test createSalesOrderHeader crea un pedido de venta en Contpaqi usando el SDK nativo"""
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		repository = SDKContpaqRepository(config["CONTPAQ"])
+
+		pedido = ContpaqPedidoVentaCabeceraAggregate(
+			CIDMOVIMIENTO=None,
+			CIDDOCUMENTO=None,
+			CNUMEROMOVIMIENTO=None,
+			CIDDOCUMENTODE=None,
+			CIDPRODUCTO=None,
+			CCODIGOCONCEPTO="2",
+			CCODIGOCTEPROV="12345",
+			CCODIGOPRODUCTO="12345P",
+			CUNIDADES=1.0,
+			CPRECIO=100.0,
+			CREFERENCIA="TEST-SDK-PEDIDO",
+		)
+
+		doc_id, mov_id = repository.createSalesOrderHeader(pedido)
+
+		self.assertIsNotNone(doc_id)
+		self.assertIsInstance(doc_id, int)
+		self.assertGreater(doc_id, 0)
+		self.assertEqual(pedido.CIDDOCUMENTO, doc_id)
+
+		self.assertIsNotNone(mov_id)
+		self.assertIsInstance(mov_id, int)
+		self.assertGreater(mov_id, 0)
+		self.assertEqual(pedido.CIDMOVIMIENTO, mov_id)
+
+	def testRun(self):
+		config_path = SRC_PATH / "conf.json"
+
+		with config_path.open("r", encoding="utf-8") as config_file:
+			config = json.load(config_file)
+
+		controller = SyncContpaqController(config)
+		controller.run()
+
 
 if __name__ == "__main__":
 	tester = test()
-	tester.testSDKContpaqGetArticles()
-	tester.testSDKContpaqGetMailings()
-
+	tester.testRun()
