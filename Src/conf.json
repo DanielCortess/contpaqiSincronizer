@@ -13,7 +13,8 @@
         "TIPOPERSONAMEX":"Fisica"
     },
     "SQLLITE":{
-        "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"
+        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
+        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqi.db"
     },
     "CONTPAQ":{
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
@@ -24,6 +25,8 @@
         "DRIVER":"{SQL Server}",
         "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
         "DATABASE":"adPRUEBAS",
-        "Trusted_Connection":"yes"
+        "Trusted_Connection":"no",
+        "SQL_USER":"sa",
+        "SQL_PASSWORD":"CONTPAQI2026"
     }
 }

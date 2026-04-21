@@ -1,0 +1,31 @@
+{
+    "GENERAL":{
+        "TIME": 3
+    },
+    "NETVY":{
+        "URLBASE":"localhost:8030",
+        "USER":"test6@gmail.com",
+        "PASSWORD":"Netvy2026",
+        "LICENSE":"NETVY-TEST-LOCAL",
+        "CODIGOFAMILIA":"FAMGE",
+        "CODIGOMONEDA":"MXN",
+        "TIPODOCUMENTO":"MX_CERTIFICATE",
+        "TIPOPERSONAMEX":"Fisica"
+    },
+    "SQLLITE":{
+        "DBPATH":"./LocalDB/SQLLITESincronizadorContpaqi.db"
+    },
+    "CONTPAQ":{
+        "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
+        "USER":"SUPERVISOR",
+        "PASSWORD":"",
+        "EMPRESA_ID": 2,
+        "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
+        "DRIVER":"{SQL Server}",
+        "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
+        "DATABASE":"adPRUEBAS",
+        "Trusted_Connection":"no",
+        "SQL_USER":"sa",
+        "SQL_PASSWORD":""
+    }
+}

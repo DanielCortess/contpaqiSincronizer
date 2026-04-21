@@ -284,8 +284,8 @@ class SyncContpaqController:
 		try:
 			win32evtlogutil.ReportEvent(
 				appName=_APP_NAME,
-				eventID=1,
-				eventType=win32evtlog.EVENTLOG_WARNING_TYPE,
+				eventID=2,
+				eventType=win32evtlog.EVENTLOG_ERROR_TYPE,
 				strings=[mensaje],
 			)
 		except Exception:
@@ -293,6 +293,15 @@ class SyncContpaqController:
 
 	def _log_info(self, mensaje):
 		print(f"[INFO] {mensaje}")
+		try:
+			win32evtlogutil.ReportEvent(
+				appName=_APP_NAME,
+				eventID=1,
+				eventType=win32evtlog.EVENTLOG_INFORMATION_TYPE,
+				strings=[mensaje],
+			)
+		except Exception:
+			pass
 
 	# -------------------------------------------------------------------------
 	# Sincronización Contpaq → Netvy

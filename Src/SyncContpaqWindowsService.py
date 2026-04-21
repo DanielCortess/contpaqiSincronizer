@@ -135,5 +135,20 @@ if __name__ == "__main__":
         except Exception as _ex:
             print(f"[ERROR] Error crítico: {_ex}")
             sys.exit(1)
+    elif len(sys.argv) == 1:
+        # En ejecutable congelado (PyInstaller), cuando SCM arranca el servicio
+        # no hay argumentos CLI y se debe inicializar explícitamente el dispatcher.
+        try:
+            servicemanager.Initialize()
+            servicemanager.PrepareToHostSingle(SyncContpaqWindowsService)
+            servicemanager.StartServiceCtrlDispatcher()
+        except Exception as _ex:
+            try:
+                servicemanager.LogErrorMsg(f"SincronizadorContpaqi StartServiceCtrlDispatcher error: {_ex}")
+            except Exception:
+                pass
+            sys.exit(1)
     else:
+        # Modo servicio/comandos (install, start, stop, remove, etc.)
+        # Debe pasar por pywin32 para registrarse con el SCM de Windows.
         win32serviceutil.HandleCommandLine(SyncContpaqWindowsService)

@@ -198,6 +198,8 @@ class SDKContpaqRepository:
 		self.server = config.get("SERVER")
 		self.database = config.get("DATABASE")
 		self.trusted_connection = config.get("Trusted_Connection", "yes")
+		self.sql_user = config.get("SQL_USER", "")
+		self.sql_password = config.get("SQL_PASSWORD", "")
 
 		if not self.server or not self.database:
 			raise ValueError("config debe incluir las llaves SERVER y DATABASE")
@@ -276,10 +278,16 @@ class SDKContpaqRepository:
 
 	def _get_connection(self):
 		"""
-		Establece y retorna una conexión a SQL Server con autenticación integrada.
+		Establece y retorna una conexión a SQL Server.
+		Usa autenticación Windows si Trusted_Connection=yes, o SQL Server si se proporcionan SQL_USER y SQL_PASSWORD.
 		"""
 		try:
-			connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};Trusted_Connection=yes;"
+			if self.trusted_connection.lower() == "yes":
+				connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};Trusted_Connection=yes;"
+			else:
+				if not self.sql_user:
+					raise ValueError("Se requiere SQL_USER cuando Trusted_Connection no es 'yes'")
+				connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};UID={self.sql_user};PWD={self.sql_password};"
 			conn = pyodbc.connect(connection_string)
 			return conn
 		except Exception as e:
