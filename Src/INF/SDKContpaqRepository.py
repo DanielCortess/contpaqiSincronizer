@@ -240,14 +240,11 @@ class SDKContpaqRepository:
 			raise ValueError(f"Formato de fecha inválido: {fecha}")
 		
 		fecha = fecha.strip()
-		
-		# Intenta formato ISO primero
-		try:
-			return datetime.fromisoformat(fecha)
-		except ValueError:
-			pass
-		
-		# Intenta formato YYYYMMDDHHMMSSСCC (17 chars con milisegundos)
+
+		# Formatos numéricos propios PRIMERO (antes de fromisoformat, que en
+		# Python 3.11 puede parsear strings de 17 dígitos de forma incorrecta)
+
+		# Formato YYYYMMDDHHMMSSMMM (17 chars con milisegundos)
 		if len(fecha) == 17:
 			try:
 				dt = datetime.strptime(fecha[:14], "%Y%m%d%H%M%S")
@@ -255,21 +252,27 @@ class SDKContpaqRepository:
 			except ValueError:
 				pass
 
-		# Intenta formato YYYYMMDDHHMMSS (14 chars)
+		# Formato YYYYMMDDHHMMSS (14 chars)
 		if len(fecha) == 14:
 			try:
 				return datetime.strptime(fecha, "%Y%m%d%H%M%S")
 			except ValueError:
 				pass
-		
-		# Intenta formato YYYYMMDD (8 chars)
+
+		# Formato YYYYMMDD (8 chars)
 		if len(fecha) == 8:
 			try:
 				return datetime.strptime(fecha, "%Y%m%d")
 			except ValueError:
 				pass
-		
-		raise ValueError(f"Formato de fecha no soportado: {fecha}. Use YYYYMMDDHHMMSSСCC (17), YYYYMMDDHHMMSS (14), YYYYMMDD (8) o ISO")
+
+		# Último recurso: formato ISO con separadores (ej: '2026-04-21T11:05:15')
+		try:
+			return datetime.fromisoformat(fecha)
+		except ValueError:
+			pass
+
+		raise ValueError(f"Formato de fecha no soportado: {fecha}. Use YYYYMMDDHHMMSSMMM (17), YYYYMMDDHHMMSS (14), YYYYMMDD (8) o ISO")
 
 	def _get_connection(self):
 		"""
