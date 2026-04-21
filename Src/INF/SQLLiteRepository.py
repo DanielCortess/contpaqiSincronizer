@@ -58,7 +58,11 @@ class SQLLiteRepository:
 		if not db_path_config:
 			raise ValueError("config debe incluir la llave DBPATH")
 
-		self.base_path = Path(__file__).resolve().parents[1]
+		base_path_config = config.get("BASEPATH")
+		if base_path_config:
+			self.base_path = Path(base_path_config).resolve()
+		else:
+			self.base_path = Path(__file__).resolve().parents[1]
 		configured_path = Path(db_path_config)
 
 		if configured_path.is_absolute():
@@ -74,6 +78,20 @@ class SQLLiteRepository:
 		with sqlite3.connect(self.db_path) as connection:
 			for table_name, create_sql in self.TABLE_DEFINITIONS.items():
 				self._sync_table(connection, table_name, create_sql)
+
+		if not self.db_path.exists():
+			raise Exception(f"No se pudo crear la base de datos SQLite en la ruta: {self.db_path}")
+
+		with sqlite3.connect(self.db_path) as connection:
+			for table_name in self.TABLE_DEFINITIONS.keys():
+				cursor = connection.execute(
+					"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+					(table_name,),
+				)
+				if cursor.fetchone() is None:
+					raise Exception(
+						f"La base de datos SQLite fue creada pero falta la tabla requerida: {table_name}"
+					)
 
 	def get_connection(self):
 		self.local_db_path.mkdir(parents=True, exist_ok=True)
