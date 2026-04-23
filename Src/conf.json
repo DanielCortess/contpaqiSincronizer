@@ -3,14 +3,12 @@
         "TIME": 3
     },
     "NETVY":{
-        "URLBASE":"localhost:8030",
-        "USER":"test6@gmail.com",
-        "PASSWORD":"Netvy2026",
+        "URLBASE":"localhost",
+        "USER":"testPaisEmpresa1706@gmail.com",
+        "PASSWORD":"ferWUk",
         "LICENSE":"NETVY-TEST-LOCAL",
         "CODIGOFAMILIA":"FAMGE",
-        "CODIGOMONEDA":"MXN",
-        "TIPODOCUMENTO":"MX_CERTIFICATE",
-        "TIPOPERSONAMEX":"Fisica"
+        "CODIGOMONEDA":"MXN"
     },
     "SQLLITE":{
         "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",

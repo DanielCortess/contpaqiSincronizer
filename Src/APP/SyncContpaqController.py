@@ -42,8 +42,8 @@ class SyncContpaqController:
 		self._netvy.login()
 		self._netvy.getFamilyConfig()
 		self._netvy.getCurrencieConfig()
-		self._netvy.getConfigTipoDocumentoID()
-		self._netvy.getConfigTipoPersonaID()
+		# self._netvy.getConfigTipoDocumentoID()
+		# self._netvy.getConfigTipoPersonaID()
 
 		# 2. Inicializar SQLite (crea el archivo y las tablas si no existen)
 		self._sqllite.init()

@@ -1,0 +1,7 @@
+# Dependencias de tiempo de ejecución
+pyodbc
+pywin32
+requests
+
+# Dependencias de build (solo para compilar el EXE, no necesarias en producción)
+pyinstaller

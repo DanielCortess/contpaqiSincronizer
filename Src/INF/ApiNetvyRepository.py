@@ -26,8 +26,8 @@ class ApiNetvyRepository:
 		self.license = config.get("LICENSE")
 		self.codigo_familia = config.get("CODIGOFAMILIA")
 		self.codigo_moneda = config.get("CODIGOMONEDA")
-		self.tipo_documento = config.get("TIPODOCUMENTO")
-		self.tipo_persona_mex = config.get("TIPOPERSONAMEX")
+		# self.tipo_documento = config.get("TIPODOCUMENTO")
+		# self.tipo_persona_mex = config.get("TIPOPERSONAMEX")
 
 		if not all([self.url_base, self.user, self.password, self.license]):
 			raise ValueError("config debe incluir las llaves URLBASE, USER, PASSWORD, LICENSE")
@@ -518,8 +518,7 @@ class ApiNetvyRepository:
 			"Telefono": mailing.Telefono or "",
 			"MonedaID": init.NetvyMonedaID,
 			"NombrePersona": mailing.Nombre or "",
-			"TipoDocumentoID": mailing.TipoDocumentoID,
-			"TipoPersonaID": mailing.TipoPersonaID,
+			"clavetipomailingid":"cliente",
 			"esCliente": True,
 			"Activo": 1,
 			"cliente":
