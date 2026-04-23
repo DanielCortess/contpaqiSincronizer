@@ -1,7 +1,10 @@
+import re
 import sqlite3
 from pathlib import Path
 
 from APP import init
+from DOM.ArticuloLogisticaAggregate import ArticuloLogisticaAggregate
+from DOM.ContpaqArticuloLogisticaCollection import ContpaqArticuloLogisticaCollection
 
 _FECHA_INICIAL = "19990101000000000"
 _REGISTROS_REQUERIDOS = [
@@ -45,7 +48,16 @@ class SQLLiteRepository:
 				ContpaqID INT NOT NULL,
 				FechaHoraSincronizacion DATETIME DEFAULT NULL,
 				Subida INTEGER DEFAULT NULL CHECK (Subida IN (0, 1) OR Subida IS NULL),
-				Accion CHAR(1) DEFAULT NULL
+				Accion CHAR(1) DEFAULT NULL,
+				Detalle TEXT DEFAULT NULL
+			)
+		""",
+		"articulostocks": """
+			CREATE TABLE articulostocks (
+				articulostocksID INTEGER PRIMARY KEY AUTOINCREMENT,
+				NetvyArticuloID INT DEFAULT NULL,
+				ContpaqArticuloID INT DEFAULT NULL,
+				StockActual REAL DEFAULT NULL
 			)
 		""",
 	}
@@ -99,18 +111,61 @@ class SQLLiteRepository:
 
 	def _sync_table(self, connection, table_name, create_sql):
 		current_sql = self._get_current_table_sql(connection, table_name)
-		desired_sql = self._normalize_sql(create_sql)
 
 		if current_sql is None:
 			connection.execute(create_sql)
 			connection.commit()
 			return
 
-		if self._normalize_sql(current_sql) == desired_sql:
-			return
+		# Añadir únicamente las columnas que faltan, sin recrear la tabla
+		existing_columns = set(self._get_table_columns(connection, table_name))
+		desired_definitions = self._parse_column_definitions(create_sql)
 
-		self._recreate_table(connection, table_name, create_sql)
+		for col_name, col_def in desired_definitions.items():
+			if col_name not in existing_columns:
+				connection.execute(f'ALTER TABLE "{table_name}" ADD COLUMN {col_def}')
+
 		connection.commit()
+
+	def _parse_column_definitions(self, create_sql):
+		"""Extrae {nombre_columna: definición_completa} del SQL de CREATE TABLE."""
+		inner = re.search(r'\((.+)\)\s*$', create_sql.strip(), re.DOTALL)
+		if not inner:
+			return {}
+
+		content = inner.group(1)
+		definitions = {}
+		depth = 0
+		current = []
+
+		for char in content:
+			if char == '(':
+				depth += 1
+				current.append(char)
+			elif char == ')':
+				depth -= 1
+				current.append(char)
+			elif char == ',' and depth == 0:
+				self._registrar_columna(current, definitions)
+				current = []
+			else:
+				current.append(char)
+
+		self._registrar_columna(current, definitions)
+		return definitions
+
+	def _registrar_columna(self, chars, definitions):
+		line = ''.join(chars).strip()
+		if not line:
+			return
+		parts = line.split()
+		if not parts:
+			return
+		col_name = parts[0].strip('"[]`')
+		# Ignorar restricciones a nivel de tabla
+		if col_name.upper() in ('PRIMARY', 'FOREIGN', 'UNIQUE', 'CHECK', 'CONSTRAINT'):
+			return
+		definitions[col_name] = line
 
 	def _get_current_table_sql(self, connection, table_name):
 		cursor = connection.execute(
@@ -120,31 +175,9 @@ class SQLLiteRepository:
 		row = cursor.fetchone()
 		return row[0] if row and row[0] else None
 
-	def _recreate_table(self, connection, table_name, create_sql):
-		backup_table_name = f"{table_name}__backup"
-
-		connection.execute(f'ALTER TABLE "{table_name}" RENAME TO "{backup_table_name}"')
-		connection.execute(create_sql)
-
-		old_columns = self._get_table_columns(connection, backup_table_name)
-		new_columns = self._get_table_columns(connection, table_name)
-		shared_columns = [column for column in new_columns if column in old_columns]
-
-		if shared_columns:
-			column_list = ", ".join(f'"{column}"' for column in shared_columns)
-			connection.execute(
-				f'INSERT INTO "{table_name}" ({column_list}) '
-				f'SELECT {column_list} FROM "{backup_table_name}"'
-			)
-
-		connection.execute(f'DROP TABLE "{backup_table_name}"')
-
 	def _get_table_columns(self, connection, table_name):
 		cursor = connection.execute(f'PRAGMA table_info("{table_name}")')
 		return [row[1] for row in cursor.fetchall()]
-
-	def _normalize_sql(self, sql):
-		return " ".join(sql.strip().replace("\n", " ").split()).lower()
 
 	def asegurar_fechas_sincronizacion(self):
 		with self.get_connection() as conn:
@@ -226,3 +259,102 @@ class SQLLiteRepository:
 				(tabla, netvy_id, contpaq_id, fecha),
 			)
 			conn.commit()
+
+	def crear_historico(self, tabla, netvy_id, contpaq_id, fecha, subida, accion, detalle):
+		"""
+		Registra una entrada en SincronizacionHistorico.
+		subida: 1 = Contpaq -> Netvy  (subida),  0 = Netvy -> Contpaq (bajada)
+		accion: 'C' = creación, 'A' = actualización, 'B' = borrar
+		detalle: descripción del resultado o excepción ocurrida
+		"""
+		with self.get_connection() as conn:
+			conn.execute(
+				"INSERT INTO SincronizacionHistorico "
+				"(Tabla, NetvyID, ContpaqID, FechaHoraSincronizacion, Subida, Accion, Detalle) "
+				"VALUES (?, ?, ?, ?, ?, ?, ?)",
+				(tabla, netvy_id, contpaq_id, fecha, subida, accion, detalle),
+			)
+			conn.commit()
+
+	def getLogisticArticles(self):
+		logistica_articulos = []
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT NetvyID, ContpaqID "
+				"FROM Sincronizacion "
+				"WHERE UPPER(Tabla) = 'ARTICULO'"
+			)
+			for row in cursor.fetchall():
+				logistica_articulos.append(
+					ArticuloLogisticaAggregate(
+						NetvyArticuloID=row[0],
+						ContpaqArticuloID=row[1],
+						StockActual=None,
+					)
+				)
+
+		return ContpaqArticuloLogisticaCollection(
+			creacion_modificar_borrar=logistica_articulos
+		)
+
+	def createUpdateLogisticArticle(self, articulo_logistica):
+		if articulo_logistica is None:
+			raise ValueError("articulo_logistica es obligatorio")
+
+		if articulo_logistica.NetvyArticuloID is None:
+			raise ValueError("NetvyArticuloID es obligatorio")
+
+		if articulo_logistica.ContpaqArticuloID is None:
+			raise ValueError("ContpaqArticuloID es obligatorio")
+
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT articulostocksID FROM articulostocks "
+				"WHERE NetvyArticuloID = ? AND ContpaqArticuloID = ?",
+				(articulo_logistica.NetvyArticuloID, articulo_logistica.ContpaqArticuloID),
+			)
+			row = cursor.fetchone()
+
+			if row:
+				conn.execute(
+					"UPDATE articulostocks SET StockActual = ? "
+					"WHERE articulostocksID = ?",
+					(articulo_logistica.StockActual, row[0]),
+				)
+			else:
+				conn.execute(
+					"INSERT INTO articulostocks (NetvyArticuloID, ContpaqArticuloID, StockActual) "
+					"VALUES (?, ?, ?)",
+					(
+						articulo_logistica.NetvyArticuloID,
+						articulo_logistica.ContpaqArticuloID,
+						articulo_logistica.StockActual,
+					),
+				)
+
+			conn.commit()
+
+	def getStockChange(self, articulo_logistica):
+		if articulo_logistica is None:
+			raise ValueError("articulo_logistica es obligatorio")
+
+		if articulo_logistica.NetvyArticuloID is None:
+			raise ValueError("NetvyArticuloID es obligatorio")
+
+		if articulo_logistica.ContpaqArticuloID is None:
+			raise ValueError("ContpaqArticuloID es obligatorio")
+
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT StockActual FROM articulostocks "
+				"WHERE NetvyArticuloID = ? AND ContpaqArticuloID = ?",
+				(articulo_logistica.NetvyArticuloID, articulo_logistica.ContpaqArticuloID),
+			)
+			row = cursor.fetchone()
+
+			# Si no existe registro previo, se considera cambio para forzar alta/actualización.
+			if row is None:
+				return True
+
+			stock_actual_db = row[0]
+			return stock_actual_db != articulo_logistica.StockActual

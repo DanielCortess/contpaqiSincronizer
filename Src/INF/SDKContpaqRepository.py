@@ -557,6 +557,65 @@ class SDKContpaqRepository:
 		except Exception as e:
 			raise Exception(f"Error al obtener clientes de SQL Server: {str(e)}")
 
+	def getLogisticArticleStock(self, articulo_logistica):
+		"""
+		Obtiene el stock neto de un artículo desde admMovimientos y actualiza
+		el atributo StockActual del aggregate recibido.
+
+		Args:
+			articulo_logistica (ArticuloLogisticaAggregate): Aggregate con
+				ContpaqArticuloID informado.
+
+		Returns:
+			ArticuloLogisticaAggregate: El mismo aggregate recibido, con
+				StockActual actualizado.
+		"""
+		if articulo_logistica is None:
+			raise ValueError("articulo_logistica es obligatorio")
+
+		if articulo_logistica.ContpaqArticuloID is None:
+			raise ValueError("ContpaqArticuloID es obligatorio para consultar stock")
+
+		conn = None
+		cursor = None
+		try:
+			conn = self._get_connection()
+			cursor = conn.cursor()
+
+			query = """
+			SELECT
+				admMovimientos.CIDPRODUCTO,
+				SUM(
+					CASE
+						WHEN admMovimientos.CTIPOTRASPASO IN (1, 3) THEN admMovimientos.CUNIDADES
+						WHEN admMovimientos.CTIPOTRASPASO = 2       THEN -admMovimientos.CUNIDADES
+						ELSE 0
+					END
+				) AS CUNIDADES_NETAS
+			FROM admMovimientos
+			WHERE admMovimientos.CIDPRODUCTO = ?
+			  AND admMovimientos.CAFECTADOINVENTARIO = 1
+			GROUP BY
+				admMovimientos.CIDPRODUCTO
+			"""
+
+			cursor.execute(query, (articulo_logistica.ContpaqArticuloID,))
+			result = cursor.fetchone()
+
+			if result and result[1] is not None:
+				articulo_logistica.StockActual = float(result[1])
+			else:
+				articulo_logistica.StockActual = 0.0
+
+			return articulo_logistica
+		except Exception as e:
+			raise Exception(f"Error al obtener stock logístico del artículo: {str(e)}")
+		finally:
+			if cursor is not None:
+				cursor.close()
+			if conn is not None:
+				conn.close()
+
 	def _map_mailing(self, row):
 		"""
 		Mapea una fila de SQL Server a ContpaqMailingAggregate.

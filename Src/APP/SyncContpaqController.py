@@ -143,11 +143,13 @@ class SyncContpaqController:
 					)
 					self._contpaq.createArticle(contpaq_art)
 					self._sqllite.crear_sincronizacion("Articulo", netvy_art.ArticuloID, contpaq_art.CIDPRODUCTO, self.fecha_articulo_netvy)
+					self._sqllite.crear_historico("Articulo", netvy_art.ArticuloID, contpaq_art.CIDPRODUCTO, self.fecha_articulo_netvy, 0, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createArticle Contpaq falló "
 						f"(codigo={netvy_art.Codigo}): {ex}"
 					)
+					self._sqllite.crear_historico("Articulo", netvy_art.ArticuloID, 0, self.fecha_articulo_netvy, 0, "C", str(ex))
 
 		# 3. Crear mailings en Contpaq
 		self._log_info("[Netvy -> Contpaq] Procesando mailings")
@@ -165,11 +167,13 @@ class SyncContpaqController:
 					)
 					self._contpaq.createMailing(contpaq_mail)
 					self._sqllite.crear_sincronizacion("Mailing", netvy_mail.MailingID, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_netvy)
+					self._sqllite.crear_historico("Mailing", netvy_mail.MailingID, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_netvy, 0, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createMailing Contpaq falló "
 						f"(codigo={netvy_mail.ReferenciaCodigo}): {ex}"
 					)
+					self._sqllite.crear_historico("Mailing", netvy_mail.MailingID, 0, self.fecha_mailing_netvy, 0, "C", str(ex))
 
 		# 4. Crear cabeceras de pedido de venta en Contpaq
 		self._log_info("[Netvy -> Contpaq] Procesando cabeceras de pedidos")
@@ -189,11 +193,13 @@ class SyncContpaqController:
 					)
 					self._contpaq.createSalesOrderHeader(contpaq_ped)
 					self._sqllite.crear_sincronizacion("PedidoVentaCabecera", netvy_ped.PedidoVentaCabeceraID, contpaq_ped.CIDDOCUMENTO, self.fecha_pedido_venta_cabecera_netvy)
+					self._sqllite.crear_historico("PedidoVentaCabecera", netvy_ped.PedidoVentaCabeceraID, contpaq_ped.CIDDOCUMENTO, self.fecha_pedido_venta_cabecera_netvy, 0, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createSalesOrderHeader Contpaq falló "
 						f"(referencia={netvy_ped.ReferenciaNuestra}): {ex}"
 					)
+					self._sqllite.crear_historico("PedidoVentaCabecera", netvy_ped.PedidoVentaCabeceraID, 0, self.fecha_pedido_venta_cabecera_netvy, 0, "C", str(ex))
 
 		# 5. Crear líneas de pedido de venta en Contpaq
 		self._log_info("[Netvy -> Contpaq] Procesando líneas de pedidos")
@@ -219,11 +225,13 @@ class SyncContpaqController:
 					)
 					self._contpaq.createSalesOrderLine(contpaq_linea)
 					self._sqllite.crear_sincronizacion("PedidoVentaLinea", netvy_linea.PedidoVentaLineaID, contpaq_linea.CIDMOVIMIENTO, self.fecha_pedido_venta_linea_netvy)
+					self._sqllite.crear_historico("PedidoVentaLinea", netvy_linea.PedidoVentaLineaID, contpaq_linea.CIDMOVIMIENTO, self.fecha_pedido_venta_linea_netvy, 0, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createSalesOrderLine Contpaq falló "
 						f"(lineaID={netvy_linea.PedidoVentaLineaID}): {ex}"
 					)
+					self._sqllite.crear_historico("PedidoVentaLinea", netvy_linea.PedidoVentaLineaID, 0, self.fecha_pedido_venta_linea_netvy, 0, "C", str(ex))
 
 		# 6. Actualizar fechas de sincronización
 		if articulos_netvy and articulos_netvy.fechaHoraHasta:
@@ -345,11 +353,13 @@ class SyncContpaqController:
 					)
 					self._netvy.createArticle(netvy_art)
 					self._sqllite.crear_sincronizacion("Articulo", netvy_art.ArticuloID, contpaq_art.CIDPRODUCTO, self.fecha_articulo_contpaq)
+					self._sqllite.crear_historico("Articulo", netvy_art.ArticuloID, contpaq_art.CIDPRODUCTO, self.fecha_articulo_contpaq, 1, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createArticle Netvy falló "
 						f"(codigo={contpaq_art.CCODIGOPRODUCTO}): {ex}"
 					)
+					self._sqllite.crear_historico("Articulo", 0, contpaq_art.CIDPRODUCTO, self.fecha_articulo_contpaq, 1, "C", str(ex))
 
 		# 3. Crear mailings en Netvy
 		if mailings_contpaq:
@@ -368,13 +378,80 @@ class SyncContpaqController:
 					)
 					self._netvy.createMailing(netvy_mail)
 					self._sqllite.crear_sincronizacion("Mailing", netvy_mail.MailingID, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_contpaq)
+					self._sqllite.crear_historico("Mailing", netvy_mail.MailingID, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_contpaq, 1, "C", "Se creó con éxito")
 				except Exception as ex:
 					self._log_error(
 						f"createMailing Netvy falló "
 						f"(codigo={contpaq_mail.CCODIGOCLIENTE}): {ex}"
 					)
+					self._sqllite.crear_historico("Mailing", 0, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_contpaq, 1, "C", str(ex))
 
-		# 4. Actualizar fechas de sincronización
+		# 4. Sincronizar stock logístico de artículos (Contpaq -> Netvy)
+		self._log_info("[Contpaq -> Netvy] Inicio de sincronización de stock logístico")
+		try:
+			articulos_logistica = self._sqllite.getLogisticArticles()
+		except Exception as ex:
+			self._log_error(f"getLogisticArticles SQLite falló: {ex}")
+			articulos_logistica = None
+
+		if articulos_logistica and articulos_logistica.creacion_modificar_borrar:
+			candidatos_con_cambio = []
+			for articulo_logistica in articulos_logistica.creacion_modificar_borrar:
+				fecha_actual = self._normalizar_fecha(datetime.now())
+				try:
+					self._contpaq.getLogisticArticleStock(articulo_logistica)
+					tiene_cambio = self._sqllite.getStockChange(articulo_logistica)
+					if tiene_cambio:
+						candidatos_con_cambio.append(articulo_logistica)
+				except Exception as ex:
+					self._log_error(
+						f"Sincronización de stock falló durante lectura/comparación "
+						f"(NetvyArticuloID={articulo_logistica.NetvyArticuloID}, ContpaqArticuloID={articulo_logistica.ContpaqArticuloID}): {ex}"
+					)
+					self._sqllite.crear_historico(
+						"Articulo",
+						articulo_logistica.NetvyArticuloID or 0,
+						articulo_logistica.ContpaqArticuloID or 0,
+						fecha_actual,
+						1,
+						"A",
+						str(ex),
+					)
+
+			articulos_logistica.creacion_modificar_borrar = candidatos_con_cambio
+
+			for articulo_logistica in articulos_logistica.creacion_modificar_borrar:
+				fecha_actual = self._normalizar_fecha(datetime.now())
+				try:
+					self._netvy.updateLogisticArticle(articulo_logistica)
+					self._sqllite.createUpdateLogisticArticle(articulo_logistica)
+					self._sqllite.crear_historico(
+						"Articulo",
+						articulo_logistica.NetvyArticuloID or 0,
+						articulo_logistica.ContpaqArticuloID or 0,
+						fecha_actual,
+						1,
+						"A",
+						"Actualizado con exito",
+					)
+				except Exception as ex:
+					self._log_error(
+						f"updateLogisticArticle Netvy falló "
+						f"(NetvyArticuloID={articulo_logistica.NetvyArticuloID}, ContpaqArticuloID={articulo_logistica.ContpaqArticuloID}): {ex}"
+					)
+					self._sqllite.crear_historico(
+						"Articulo",
+						articulo_logistica.NetvyArticuloID or 0,
+						articulo_logistica.ContpaqArticuloID or 0,
+						fecha_actual,
+						1,
+						"A",
+						str(ex),
+					)
+
+		self._log_info("[Contpaq -> Netvy] Fin de sincronización de stock logístico")
+
+		# 5. Actualizar fechas de sincronización
 		if articulos_contpaq and articulos_contpaq.fechaHoraHasta:
 			try:
 				fecha = self._normalizar_fecha(articulos_contpaq.fechaHoraHasta)

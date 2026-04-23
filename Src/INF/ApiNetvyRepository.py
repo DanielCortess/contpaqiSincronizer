@@ -595,3 +595,48 @@ class ApiNetvyRepository:
 
 		articulo.ArticuloID = articulo_id
 		return articulo_id
+
+	def updateLogisticArticle(self, articulo_logistica):
+		"""
+		Actualiza el stock logístico de un artículo en la API de Netvy.
+
+		Args:
+			articulo_logistica (ArticuloLogisticaAggregate): Aggregate con
+				NetvyArticuloID y StockActual.
+
+		Returns:
+			bool: True si la actualización fue exitosa (HTTP 204).
+		"""
+		if articulo_logistica is None:
+			raise ValueError("articulo_logistica es obligatorio")
+
+		if articulo_logistica.NetvyArticuloID is None:
+			raise ValueError("NetvyArticuloID es obligatorio")
+
+		if articulo_logistica.StockActual is None:
+			raise ValueError("StockActual es obligatorio")
+
+		url = f"{self.url_base}/articulologisticaStock"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"ArticuloID": articulo_logistica.NetvyArticuloID,
+			"StockActual": articulo_logistica.StockActual,
+		}
+
+		response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code != 204:
+			raise Exception(
+				f"Error al actualizar stock logístico del artículo en la API: "
+				f"{response.status_code} - {response.text}"
+			)
+
+		return True
