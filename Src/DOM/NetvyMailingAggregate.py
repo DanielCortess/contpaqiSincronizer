@@ -17,6 +17,7 @@ class NetvyMailingAggregate:
 		Observacion=None,
 		TipoMailID=None,
 		FechaHoraUsuario=None,
+		FechaHoraModificado=None,
 		ReferenciaCodigo=None,
 		Activo=None,
 		Latitud=None,
@@ -43,6 +44,7 @@ class NetvyMailingAggregate:
 		self.Observacion = Observacion
 		self.TipoMailID = TipoMailID
 		self.FechaHoraUsuario = FechaHoraUsuario
+		self.FechaHoraModificado = FechaHoraModificado
 		self.ReferenciaCodigo = ReferenciaCodigo
 		self.Activo = Activo
 		self.Latitud = Latitud

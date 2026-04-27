@@ -119,6 +119,7 @@ class ApiNetvyRepository:
 			EmpresaID=data.get("EmpresaID"),
 			UsuarioID=data.get("UsuarioID"),
 			FechaHoraUsuario=data.get("FechaHoraUsuario"),
+			FechaHoraModificado=data.get("FechaHoraModificado"),
 			Nombre=data.get("Nombre"),
 			Activo=data.get("Activo"),
 			TipoArticuloID=data.get("TipoArticuloID"),
@@ -127,6 +128,88 @@ class ApiNetvyRepository:
 			Descripcion=data.get("Descripcion"),
 			CodigoAlternativo=data.get("CodigoAlternativo"),
 		)
+
+	def getArticleByID(self, articulo_id):
+		url = f"{self.url_base}/article?articuloid={articulo_id}"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			try:
+				error_data = response.json()
+				error_msg = error_data.get("error", error_data.get("message", response.text))
+			except Exception:
+				error_msg = response.text
+			raise Exception(f"Error al obtener artículo por ID: {response.status_code} - {error_msg}")
+
+		data = response.json()
+		if isinstance(data, list) and len(data) > 0:
+			return self._map_articulo(data[0])
+
+		return NetvyArticuloAggregate()
+
+	def _normalize_mailing_item(self, item):
+		return {
+			"MailingID": item.get("MailingID", item.get("mailingID")),
+			"EmpresaID": item.get("EmpresaID", item.get("empresaID")),
+			"Nombre": item.get("Nombre", item.get("nombre")),
+			"Direccion": item.get("Direccion", item.get("direccion")),
+			"Telefono": item.get("Telefono", item.get("telefono")),
+			"Fax": item.get("Fax", item.get("fax")),
+			"Email": item.get("Email", item.get("email")),
+			"Web": item.get("Web", item.get("web")),
+			"Cif": item.get("Cif", item.get("cif")),
+			"Directorio": item.get("Directorio", item.get("directorio")),
+			"CustomerID": item.get("CustomerID", item.get("customerID")),
+			"FechaHoraAlta": item.get("FechaHoraAlta", item.get("fechaHoraAlta")),
+			"FechaBaja": item.get("FechaBaja", item.get("fechaBaja")),
+			"Observacion": item.get("Observacion", item.get("observacion")),
+			"TipoMailID": item.get("TipoMailID", item.get("tipoMailID")),
+			"FechaHoraUsuario": item.get("FechaHoraUsuario", item.get("fechaHoraUsuario")),
+			"FechaHoraModificado": item.get("FechaHoraModificado", item.get("fechaHoraModificado")),
+			"ReferenciaCodigo": item.get("ReferenciaCodigo", item.get("referenciaCodigo")),
+			"Activo": item.get("Activo", item.get("activo")),
+			"Latitud": item.get("Latitud", item.get("latitud")),
+			"Longitud": item.get("Longitud", item.get("longitud")),
+			"NombreComercial": item.get("NombreComercial", item.get("nombreComercial")),
+			"Notas": item.get("Notas", item.get("notas")),
+		}
+
+	def getMailingByID(self, mailing_id):
+		url = f"{self.url_base}/thirdparty?MailingID={mailing_id}"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		response = requests.get(url, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.get(url, headers=headers)
+
+		if response.status_code != 200:
+			try:
+				error_data = response.json()
+				error_msg = error_data.get("error", error_data.get("message", response.text))
+			except Exception:
+				error_msg = response.text
+			raise Exception(f"Error al obtener mailing por ID: {response.status_code} - {error_msg}")
+
+		data = response.json()
+		if isinstance(data, list) and len(data) > 0:
+			normalized = self._normalize_mailing_item(data[0])
+			return self._map_mailing(normalized)
+
+		return NetvyMailingAggregate()
 
 	def getMailings(self, fecha):
 		url = f"{self.url_base}/changeRegister/mailing/{fecha}"
@@ -177,6 +260,7 @@ class ApiNetvyRepository:
 			Observacion=data.get("Observacion"),
 			TipoMailID=data.get("TipoMailID"),
 			FechaHoraUsuario=data.get("FechaHoraUsuario"),
+			FechaHoraModificado=data.get("FechaHoraModificado"),
 			ReferenciaCodigo=data.get("ReferenciaCodigo"),
 			Activo=data.get("Activo"),
 			Latitud=data.get("Latitud"),
@@ -222,6 +306,7 @@ class ApiNetvyRepository:
 			CustomerID=data.get("CustomerID"),
 			EmpresaID=data.get("EmpresaID"),
 			FechaHoraUsuario=data.get("FechaHoraUsuario"),
+			FechaHoraModificado=data.get("FechaHoraModificado"),
 			SeriePedidoID=data.get("SeriePedidoID"),
 			Numero=data.get("Numero"),
 			Fecha=data.get("Fecha"),
@@ -595,6 +680,105 @@ class ApiNetvyRepository:
 
 		articulo.ArticuloID = articulo_id
 		return articulo_id
+
+	def updateArticle(self, articulo):
+		"""
+		Actualiza un artículo existente en la API de Netvy.
+
+		Args:
+			articulo (NetvyArticuloAggregate): Aggregate con ArticuloID, Codigo y Nombre.
+
+		Returns:
+			bool: True si la actualización fue exitosa (HTTP 204).
+		"""
+		if articulo is None:
+			raise ValueError("articulo es obligatorio")
+
+		if articulo.ArticuloID is None:
+			raise ValueError("ArticuloID es obligatorio")
+
+		url = f"{self.url_base}/articulo/{articulo.ArticuloID}"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"ArticuloID": articulo.ArticuloID,
+			"Codigo": articulo.Codigo or "",
+			"Nombre": articulo.Nombre or "",
+		}
+
+		response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code != 204:
+			raise Exception(
+				f"Error al actualizar artículo en la API: "
+				f"{response.status_code} - {response.text}"
+			)
+
+		return True
+
+	def updateMailing(self, mailing):
+		"""
+		Actualiza un mailing existente en la API de Netvy.
+
+		Args:
+			mailing (NetvyMailingAggregate): Aggregate con MailingID y datos del body.
+
+		Returns:
+			bool: True si la actualización fue exitosa (HTTP 200).
+		"""
+		if mailing is None:
+			raise ValueError("mailing es obligatorio")
+
+		if mailing.MailingID is None:
+			raise ValueError("MailingID es obligatorio")
+
+		if init.NetvyMonedaID is None:
+			raise ValueError("NetvyMonedaID no está configurado. Ejecute getCurrencieConfig() primero")
+
+		url = f"{self.url_base}/thirdparty/{mailing.MailingID}"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"ReferenciaCodigo": mailing.ReferenciaCodigo or "",
+			"Cif": mailing.Cif or "",
+			"Nombre": mailing.Nombre or "",
+			"NombreComercial": mailing.NombreComercial or "",
+			"Email": mailing.Email or "",
+			"Web": mailing.Web or "",
+			"Fax": mailing.Fax or "",
+			"Telefono": mailing.Telefono or "",
+			"MonedaID": init.NetvyMonedaID,
+			"NombrePersona": mailing.Nombre or "",
+			"esCliente": True,
+			"Activo": 1,
+			"cliente": {
+				"clienteid": 0,
+			},
+		}
+
+		response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.patch(url, json=body, headers=headers)
+
+		if response.status_code != 200:
+			raise Exception(
+				f"Error al actualizar mailing en la API: "
+				f"{response.status_code} - {response.text}"
+			)
+
+		return True
 
 	def updateLogisticArticle(self, articulo_logistica):
 		"""

@@ -251,12 +251,31 @@ class SQLLiteRepository:
 			row = cursor.fetchone()
 			return row[0] if row else None
 
+	def get_netvy_id_por_contpaq_id(self, tabla, contpaq_id):
+		with self.get_connection() as conn:
+			cursor = conn.execute(
+				"SELECT NetvyID FROM Sincronizacion "
+				"WHERE Tabla = ? AND ContpaqID = ?",
+				(tabla, contpaq_id),
+			)
+			row = cursor.fetchone()
+			return row[0] if row else None
+
 	def crear_sincronizacion(self, tabla, netvy_id, contpaq_id, fecha):
 		with self.get_connection() as conn:
 			conn.execute(
 				"INSERT INTO Sincronizacion (Tabla, NetvyID, ContpaqID, FechaHoraUltimaSincronizacion) "
 				"VALUES (?, ?, ?, ?)",
 				(tabla, netvy_id, contpaq_id, fecha),
+			)
+			conn.commit()
+
+	def actualizar_fecha_ultima_sincronizacion(self, tabla, netvy_id, contpaq_id, fecha):
+		with self.get_connection() as conn:
+			conn.execute(
+				"UPDATE Sincronizacion SET FechaHoraUltimaSincronizacion = ? "
+				"WHERE Tabla = ? AND NetvyID = ? AND ContpaqID = ?",
+				(fecha, tabla, netvy_id, contpaq_id),
 			)
 			conn.commit()
 

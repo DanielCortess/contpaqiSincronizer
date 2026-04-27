@@ -8,6 +8,7 @@ class NetvyArticuloAggregate:
 		EmpresaID=None,
 		UsuarioID=None,
 		FechaHoraUsuario=None,
+		FechaHoraModificado=None,
 		Nombre=None,
 		Activo=None,
 		TipoArticuloID=None,
@@ -23,6 +24,7 @@ class NetvyArticuloAggregate:
 		self.EmpresaID = EmpresaID
 		self.UsuarioID = UsuarioID
 		self.FechaHoraUsuario = FechaHoraUsuario
+		self.FechaHoraModificado = FechaHoraModificado
 		self.Nombre = Nombre
 		self.Activo = Activo
 		self.TipoArticuloID = TipoArticuloID

@@ -557,6 +557,74 @@ class SDKContpaqRepository:
 		except Exception as e:
 			raise Exception(f"Error al obtener clientes de SQL Server: {str(e)}")
 
+	def getArticleByID(self, articulo_id):
+		"""
+		Obtiene un artículo de Contpaq por CIDPRODUCTO.
+
+		Args:
+			articulo_id (int): ID del artículo en Contpaq.
+
+		Returns:
+			ContpaqArticuloAggregate: Aggregate del artículo encontrado o vacío
+			si no existe.
+		"""
+		try:
+			conn = self._get_connection()
+			cursor = conn.cursor()
+
+			query = """
+			SELECT TOP 1 CIDPRODUCTO, CCODIGOPRODUCTO, CNOMBREPRODUCTO, CTIPOPRODUCTO,
+			       CFECHAALTAPRODUCTO, CFECHABAJA, CTIMESTAMP
+			FROM dbo.admProductos
+			WHERE CIDPRODUCTO = ?
+			"""
+
+			cursor.execute(query, (articulo_id,))
+			row = cursor.fetchone()
+			cursor.close()
+			conn.close()
+
+			if row:
+				return self._map_articulo(row)
+
+			return ContpaqArticuloAggregate()
+		except Exception as e:
+			raise Exception(f"Error al obtener artículo por ID en SQL Server: {str(e)}")
+
+	def getMailingByID(self, mailing_id):
+		"""
+		Obtiene un mailing (cliente/proveedor) de Contpaq por CIDCLIENTEPROVEEDOR.
+
+		Args:
+			mailing_id (int): ID del mailing en Contpaq.
+
+		Returns:
+			ContpaqMailingAggregate: Aggregate del mailing encontrado o vacío
+			si no existe.
+		"""
+		try:
+			conn = self._get_connection()
+			cursor = conn.cursor()
+
+			query = """
+			SELECT TOP 1 CIDCLIENTEPROVEEDOR, CCODIGOCLIENTE, CRAZONSOCIAL,
+			       CFECHAALTA, CRFC, CTIMESTAMP
+			FROM dbo.admClientes
+			WHERE CIDCLIENTEPROVEEDOR = ?
+			"""
+
+			cursor.execute(query, (mailing_id,))
+			row = cursor.fetchone()
+			cursor.close()
+			conn.close()
+
+			if row:
+				return self._map_mailing(row)
+
+			return ContpaqMailingAggregate()
+		except Exception as e:
+			raise Exception(f"Error al obtener mailing por ID en SQL Server: {str(e)}")
+
 	def getLogisticArticleStock(self, articulo_logistica):
 		"""
 		Obtiene el stock neto de un artículo desde admMovimientos y actualiza
@@ -914,5 +982,249 @@ class SDKContpaqRepository:
 			linea.CNUMEROMOVIMIENTO = 1
 
 			return nuevo_mov_id.value
+		finally:
+			self._cerrar_sdk(sdk, cwd)
+
+	def updateArticle(self, articulo):
+		"""
+		Actualiza un artículo existente en Contpaqi usando el SDK nativo.
+
+		Args:
+			articulo (ContpaqArticuloAggregate): Aggregate con identificador y
+				campos a actualizar (CCODIGOPRODUCTO, CNOMBREPRODUCTO).
+
+		Returns:
+			int: CIDPRODUCTO actualizado.
+		"""
+		if articulo is None:
+			raise ValueError("articulo es obligatorio")
+		if articulo.CIDPRODUCTO is None and not articulo.CCODIGOPRODUCTO:
+			raise ValueError("CIDPRODUCTO o CCODIGOPRODUCTO es obligatorio para actualizar artículo")
+
+		sdk, cwd = self._iniciar_sdk()
+		try:
+			sdk.fBuscaIdProducto.restype = c_int
+			sdk.fBuscaIdProducto.argtypes = [c_int]
+			sdk.fBuscaProducto.restype = c_int
+			sdk.fBuscaProducto.argtypes = [ctypes.c_char_p]
+			sdk.fEditaProducto.restype = c_int
+			sdk.fSetDatoProducto.restype = c_int
+			sdk.fSetDatoProducto.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+			sdk.fGuardaProducto.restype = c_int
+
+			if articulo.CIDPRODUCTO is not None:
+				result = sdk.fBuscaIdProducto(int(articulo.CIDPRODUCTO))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fBuscaIdProducto: código {result} — {msg}")
+			else:
+				result = sdk.fBuscaProducto(str(articulo.CCODIGOPRODUCTO).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fBuscaProducto: código {result} — {msg}")
+
+			result = sdk.fEditaProducto()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fEditaProducto: código {result} — {msg}")
+
+			if articulo.CCODIGOPRODUCTO is not None:
+				result = sdk.fSetDatoProducto(b"CCODIGOPRODUCTO", str(articulo.CCODIGOPRODUCTO).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoProducto(CCODIGOPRODUCTO): código {result} — {msg}")
+
+			if articulo.CNOMBREPRODUCTO is not None:
+				result = sdk.fSetDatoProducto(b"CNOMBREPRODUCTO", str(articulo.CNOMBREPRODUCTO).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoProducto(CNOMBREPRODUCTO): código {result} — {msg}")
+
+			result = sdk.fGuardaProducto()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fGuardaProducto: código {result} — {msg}")
+
+			return articulo.CIDPRODUCTO
+		finally:
+			self._cerrar_sdk(sdk, cwd)
+
+	def updateMailing(self, mailing):
+		"""
+		Actualiza un cliente/proveedor existente en Contpaqi usando el SDK nativo.
+
+		Args:
+			mailing (ContpaqMailingAggregate): Aggregate con identificador y
+				campos a actualizar (CCODIGOCLIENTE, CRAZONSOCIAL, CRFC).
+
+		Returns:
+			int: CIDCLIENTEPROVEEDOR actualizado.
+		"""
+		if mailing is None:
+			raise ValueError("mailing es obligatorio")
+		if mailing.CIDCLIENTEPROVEEDOR is None and not mailing.CCODIGOCLIENTE:
+			raise ValueError("CIDCLIENTEPROVEEDOR o CCODIGOCLIENTE es obligatorio para actualizar mailing")
+
+		sdk, cwd = self._iniciar_sdk()
+		try:
+			sdk.fBuscaIdCteProv.restype = c_int
+			sdk.fBuscaIdCteProv.argtypes = [c_int]
+			sdk.fBuscaCteProv.restype = c_int
+			sdk.fBuscaCteProv.argtypes = [ctypes.c_char_p]
+			sdk.fEditaCteProv.restype = c_int
+			sdk.fSetDatoCteProv.restype = c_int
+			sdk.fSetDatoCteProv.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+			sdk.fGuardaCteProv.restype = c_int
+
+			if mailing.CIDCLIENTEPROVEEDOR is not None:
+				result = sdk.fBuscaIdCteProv(int(mailing.CIDCLIENTEPROVEEDOR))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fBuscaIdCteProv: código {result} — {msg}")
+			else:
+				result = sdk.fBuscaCteProv(str(mailing.CCODIGOCLIENTE).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fBuscaCteProv: código {result} — {msg}")
+
+			result = sdk.fEditaCteProv()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fEditaCteProv: código {result} — {msg}")
+
+			if mailing.CCODIGOCLIENTE is not None:
+				result = sdk.fSetDatoCteProv(b"CCODIGOCLIENTE", str(mailing.CCODIGOCLIENTE).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoCteProv(CCODIGOCLIENTE): código {result} — {msg}")
+
+			if mailing.CRAZONSOCIAL is not None:
+				result = sdk.fSetDatoCteProv(b"CRAZONSOCIAL", str(mailing.CRAZONSOCIAL).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoCteProv(CRAZONSOCIAL): código {result} — {msg}")
+
+			if mailing.CRFC is not None:
+				result = sdk.fSetDatoCteProv(b"CRFC", str(mailing.CRFC).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoCteProv(CRFC): código {result} — {msg}")
+
+			result = sdk.fGuardaCteProv()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fGuardaCteProv: código {result} — {msg}")
+
+			return mailing.CIDCLIENTEPROVEEDOR
+		finally:
+			self._cerrar_sdk(sdk, cwd)
+
+	def updateSalesOrderHeader(self, pedido):
+		"""
+		Actualiza una cabecera de pedido de venta usando el SDK nativo.
+		"""
+		if pedido is None:
+			raise ValueError("pedido es obligatorio")
+		if pedido.CIDDOCUMENTO is None:
+			raise ValueError("CIDDOCUMENTO es obligatorio para actualizar cabecera")
+
+		if pedido.COBSERVACIONES is None and pedido.CREFERENCIA is None:
+			return pedido.CIDDOCUMENTO
+
+		sdk, cwd = self._iniciar_sdk()
+		try:
+			sdk.fBuscarIdDocumento.restype = c_int
+			sdk.fBuscarIdDocumento.argtypes = [c_int]
+			sdk.fEditarDocumento.restype = c_int
+			sdk.fSetDatoDocumento.restype = c_int
+			sdk.fSetDatoDocumento.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+			sdk.fGuardaDocumento.restype = c_int
+
+			result = sdk.fBuscarIdDocumento(int(pedido.CIDDOCUMENTO))
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fBuscarIdDocumento: código {result} — {msg}")
+
+			result = sdk.fEditarDocumento()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fEditarDocumento: código {result} — {msg}")
+
+			if pedido.COBSERVACIONES is not None:
+				result = sdk.fSetDatoDocumento(b"COBSERVACIONES", str(pedido.COBSERVACIONES).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoDocumento(COBSERVACIONES): código {result} — {msg}")
+
+			if pedido.CREFERENCIA is not None:
+				result = sdk.fSetDatoDocumento(b"CREFERENCIA", str(pedido.CREFERENCIA).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoDocumento(CREFERENCIA): código {result} — {msg}")
+
+			result = sdk.fGuardaDocumento()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fGuardaDocumento: código {result} — {msg}")
+
+			return pedido.CIDDOCUMENTO
+		finally:
+			self._cerrar_sdk(sdk, cwd)
+
+	def updateSalesOrderLine(self, linea):
+		"""
+		Actualiza una línea de pedido de venta usando el SDK nativo.
+		"""
+		if linea is None:
+			raise ValueError("linea es obligatoria")
+		if linea.CIDMOVIMIENTO is None:
+			raise ValueError("CIDMOVIMIENTO es obligatorio para actualizar línea")
+
+		if linea.CUNIDADES is None and linea.CPRECIO is None and linea.CREFERENCIA is None:
+			return linea.CIDMOVIMIENTO
+
+		sdk, cwd = self._iniciar_sdk()
+		try:
+			sdk.fBuscarIdMovimiento.restype = c_int
+			sdk.fBuscarIdMovimiento.argtypes = [c_int]
+			sdk.fEditarMovimiento.restype = c_int
+			sdk.fSetDatoMovimiento.restype = c_int
+			sdk.fSetDatoMovimiento.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+			sdk.fGuardaMovimiento.restype = c_int
+
+			result = sdk.fBuscarIdMovimiento(int(linea.CIDMOVIMIENTO))
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fBuscarIdMovimiento: código {result} — {msg}")
+
+			result = sdk.fEditarMovimiento()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fEditarMovimiento: código {result} — {msg}")
+
+			if linea.CUNIDADES is not None:
+				result = sdk.fSetDatoMovimiento(b"CUNIDADES", str(float(linea.CUNIDADES)).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoMovimiento(CUNIDADES): código {result} — {msg}")
+
+			if linea.CPRECIO is not None:
+				result = sdk.fSetDatoMovimiento(b"CPRECIO", str(float(linea.CPRECIO)).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoMovimiento(CPRECIO): código {result} — {msg}")
+
+			if linea.CREFERENCIA is not None:
+				result = sdk.fSetDatoMovimiento(b"CREFERENCIA", str(linea.CREFERENCIA).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoMovimiento(CREFERENCIA): código {result} — {msg}")
+
+			result = sdk.fGuardaMovimiento()
+			if result != 0:
+				msg = self._leer_error_sdk(sdk, result)
+				raise Exception(f"Error fGuardaMovimiento: código {result} — {msg}")
+
+			return linea.CIDMOVIMIENTO
 		finally:
 			self._cerrar_sdk(sdk, cwd)

@@ -5,6 +5,7 @@ class NetvyPedidoVentaCabeceraAggregate:
 		CustomerID=None,
 		EmpresaID=None,
 		FechaHoraUsuario=None,
+		FechaHoraModificado=None,
 		SeriePedidoID=None,
 		Numero=None,
 		Fecha=None,
@@ -30,6 +31,7 @@ class NetvyPedidoVentaCabeceraAggregate:
 		self.CustomerID = CustomerID
 		self.EmpresaID = EmpresaID
 		self.FechaHoraUsuario = FechaHoraUsuario
+		self.FechaHoraModificado = FechaHoraModificado
 		self.SeriePedidoID = SeriePedidoID
 		self.Numero = Numero
 		self.Fecha = Fecha
