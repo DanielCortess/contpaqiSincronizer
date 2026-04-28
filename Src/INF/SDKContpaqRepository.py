@@ -359,7 +359,7 @@ class SDKContpaqRepository:
 			SELECT TOP 1 CTIMESTAMP
 			FROM dbo.admProductos
 			WHERE CTIMESTAMP > ?
-			ORDER BY CTIMESTAMP DESC
+			ORDER BY CAST(CTIMESTAMP AS DATETIME) DESC
 			"""
 
 			cursor.execute(query, (fecha_desde,))
@@ -401,7 +401,7 @@ class SDKContpaqRepository:
 			       CFECHAALTAPRODUCTO, CFECHABAJA, CTIMESTAMP
 			FROM dbo.admProductos
 			WHERE CTIMESTAMP > ? AND CTIMESTAMP <= ?
-			ORDER BY CTIMESTAMP DESC
+			ORDER BY CAST(CTIMESTAMP AS DATETIME) DESC
 			"""
 
 			cursor.execute(query, (fecha_desde, fecha_hasta))
@@ -501,7 +501,7 @@ class SDKContpaqRepository:
 			SELECT TOP 1 CTIMESTAMP
 			FROM dbo.admClientes
 			WHERE CTIMESTAMP > ?
-			ORDER BY CTIMESTAMP DESC
+			ORDER BY CAST(CTIMESTAMP AS DATETIME) DESC
 			"""
 
 			cursor.execute(query, (fecha_desde,))
@@ -543,7 +543,7 @@ class SDKContpaqRepository:
 			       CFECHAALTA, CRFC, CTIMESTAMP
 			FROM dbo.admClientes
 			WHERE CTIMESTAMP > ? AND CTIMESTAMP <= ?
-			ORDER BY CTIMESTAMP DESC
+			ORDER BY CAST(CTIMESTAMP AS DATETIME) DESC
 			"""
 
 			cursor.execute(query, (fecha_desde, fecha_hasta))

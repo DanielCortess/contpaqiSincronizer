@@ -359,6 +359,7 @@ imports:
  &#8226;   <a href="#INF.SDKContpaqRepository">INF.SDKContpaqRepository</a>
  &#8226;   <a href="#INF.SQLLiteRepository">INF.SQLLiteRepository</a>
  &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#threading">threading</a>
  &#8226;   <a href="#time">time</a>
  &#8226;   <a href="#win32evtlog">win32evtlog</a>
  &#8226;   <a href="#win32evtlogutil">win32evtlogutil</a>
@@ -396,8 +397,10 @@ imported by:
   <a target="code" href="-" type="text/plain"><tt>DOM</tt></a>
 <span class="moduletype">NamespacePackage</span>  <div class="import">
 imported by:
-    <a href="#DOM.ContpaqArticuloAggregate">DOM.ContpaqArticuloAggregate</a>
+    <a href="#DOM.ArticuloLogisticaAggregate">DOM.ArticuloLogisticaAggregate</a>
+ &#8226;   <a href="#DOM.ContpaqArticuloAggregate">DOM.ContpaqArticuloAggregate</a>
  &#8226;   <a href="#DOM.ContpaqArticuloCollection">DOM.ContpaqArticuloCollection</a>
+ &#8226;   <a href="#DOM.ContpaqArticuloLogisticaCollection">DOM.ContpaqArticuloLogisticaCollection</a>
  &#8226;   <a href="#DOM.ContpaqMailingAggregate">DOM.ContpaqMailingAggregate</a>
  &#8226;   <a href="#DOM.ContpaqMailingCollection">DOM.ContpaqMailingCollection</a>
  &#8226;   <a href="#DOM.ContpaqPedidoVentaCabeceraAggregate">DOM.ContpaqPedidoVentaCabeceraAggregate</a>
@@ -411,6 +414,22 @@ imported by:
  &#8226;   <a href="#DOM.NetvyPedidoVentaCabeceraCollection">DOM.NetvyPedidoVentaCabeceraCollection</a>
  &#8226;   <a href="#DOM.NetvyPedidoVentaLineaAggregate">DOM.NetvyPedidoVentaLineaAggregate</a>
  &#8226;   <a href="#DOM.NetvyPedidoVentaLineaCollection">DOM.NetvyPedidoVentaLineaCollection</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="DOM.ArticuloLogisticaAggregate"></a>
+  <a target="code" href="///C:/Users/Usuario/Documents/SincronizadorContpaqi/Src/DOM/ArticuloLogisticaAggregate.py" type="text/plain"><tt>DOM.ArticuloLogisticaAggregate</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#DOM">DOM</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#INF.SQLLiteRepository">INF.SQLLiteRepository</a>
 
   </div>
 
@@ -444,6 +463,22 @@ imports:
   <div class="import">
 imported by:
     <a href="#INF.SDKContpaqRepository">INF.SDKContpaqRepository</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="DOM.ContpaqArticuloLogisticaCollection"></a>
+  <a target="code" href="///C:/Users/Usuario/Documents/SincronizadorContpaqi/Src/DOM/ContpaqArticuloLogisticaCollection.py" type="text/plain"><tt>DOM.ContpaqArticuloLogisticaCollection</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#DOM">DOM</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#INF.SQLLiteRepository">INF.SQLLiteRepository</a>
 
   </div>
 
@@ -736,8 +771,11 @@ imported by:
 imports:
     <a href="#APP">APP</a>
  &#8226;   <a href="#APP.init">APP.init</a>
+ &#8226;   <a href="#DOM.ArticuloLogisticaAggregate">DOM.ArticuloLogisticaAggregate</a>
+ &#8226;   <a href="#DOM.ContpaqArticuloLogisticaCollection">DOM.ContpaqArticuloLogisticaCollection</a>
  &#8226;   <a href="#INF">INF</a>
  &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#sqlite3">sqlite3</a>
 
   </div>
@@ -6381,7 +6419,6 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
- &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -6515,8 +6552,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib">importlib</a>
- &#8226;   <a href="#importlib.abc">importlib.abc</a>
+    <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#py_compile">py_compile</a>
  &#8226;   <a href="#pywintypes">pywintypes</a>
@@ -7946,7 +7982,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#SyncContpaqWindowsService.py">SyncContpaqWindowsService.py</a>
+    <a href="#INF.SQLLiteRepository">INF.SQLLiteRepository</a>
+ &#8226;   <a href="#SyncContpaqWindowsService.py">SyncContpaqWindowsService.py</a>
  &#8226;   <a href="#_pydecimal">_pydecimal</a>
  &#8226;   <a href="#_sre">_sre</a>
  &#8226;   <a href="#_strptime">_strptime</a>
@@ -9287,7 +9324,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#SyncContpaqWindowsService.py">SyncContpaqWindowsService.py</a>
+    <a href="#APP.SyncContpaqController">APP.SyncContpaqController</a>
+ &#8226;   <a href="#SyncContpaqWindowsService.py">SyncContpaqWindowsService.py</a>
  &#8226;   <a href="#_threading_local">_threading_local</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
