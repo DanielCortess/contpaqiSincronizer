@@ -20,7 +20,6 @@ _REGISTROS_REQUERIDOS = [
 
 
 class SQLLiteRepository:
-	
 	# Mantener el SQL visible facilita ajustar la estructura durante el desarrollo.
 	TABLE_DEFINITIONS = {
 		"FechaSincronizacion": """
@@ -52,14 +51,6 @@ class SQLLiteRepository:
 				Detalle TEXT DEFAULT NULL
 			)
 		""",
-		"articulostocks": """
-			CREATE TABLE articulostocks (
-				articulostocksID INTEGER PRIMARY KEY AUTOINCREMENT,
-				NetvyArticuloID INT DEFAULT NULL,
-				ContpaqArticuloID INT DEFAULT NULL,
-				StockActual REAL DEFAULT NULL
-			)
-		""",
 	}
 
 	def __init__(self, config):
@@ -87,14 +78,14 @@ class SQLLiteRepository:
 	def init(self):
 		self.local_db_path.mkdir(parents=True, exist_ok=True)
 
-		with sqlite3.connect(self.db_path) as connection:
+		with self.get_connection() as connection:
 			for table_name, create_sql in self.TABLE_DEFINITIONS.items():
 				self._sync_table(connection, table_name, create_sql)
 
 		if not self.db_path.exists():
 			raise Exception(f"No se pudo crear la base de datos SQLite en la ruta: {self.db_path}")
 
-		with sqlite3.connect(self.db_path) as connection:
+		with self.get_connection() as connection:
 			for table_name in self.TABLE_DEFINITIONS.keys():
 				cursor = connection.execute(
 					"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
@@ -107,7 +98,7 @@ class SQLLiteRepository:
 
 	def get_connection(self):
 		self.local_db_path.mkdir(parents=True, exist_ok=True)
-		return sqlite3.connect(self.db_path)
+		return sqlite3.connect(self.db_path, timeout=15)
 
 	def _sync_table(self, connection, table_name, create_sql):
 		current_sql = self._get_current_table_sql(connection, table_name)
@@ -316,64 +307,4 @@ class SQLLiteRepository:
 			creacion_modificar_borrar=logistica_articulos
 		)
 
-	def createUpdateLogisticArticle(self, articulo_logistica):
-		if articulo_logistica is None:
-			raise ValueError("articulo_logistica es obligatorio")
 
-		if articulo_logistica.NetvyArticuloID is None:
-			raise ValueError("NetvyArticuloID es obligatorio")
-
-		if articulo_logistica.ContpaqArticuloID is None:
-			raise ValueError("ContpaqArticuloID es obligatorio")
-
-		with self.get_connection() as conn:
-			cursor = conn.execute(
-				"SELECT articulostocksID FROM articulostocks "
-				"WHERE NetvyArticuloID = ? AND ContpaqArticuloID = ?",
-				(articulo_logistica.NetvyArticuloID, articulo_logistica.ContpaqArticuloID),
-			)
-			row = cursor.fetchone()
-
-			if row:
-				conn.execute(
-					"UPDATE articulostocks SET StockActual = ? "
-					"WHERE articulostocksID = ?",
-					(articulo_logistica.StockActual, row[0]),
-				)
-			else:
-				conn.execute(
-					"INSERT INTO articulostocks (NetvyArticuloID, ContpaqArticuloID, StockActual) "
-					"VALUES (?, ?, ?)",
-					(
-						articulo_logistica.NetvyArticuloID,
-						articulo_logistica.ContpaqArticuloID,
-						articulo_logistica.StockActual,
-					),
-				)
-
-			conn.commit()
-
-	def getStockChange(self, articulo_logistica):
-		if articulo_logistica is None:
-			raise ValueError("articulo_logistica es obligatorio")
-
-		if articulo_logistica.NetvyArticuloID is None:
-			raise ValueError("NetvyArticuloID es obligatorio")
-
-		if articulo_logistica.ContpaqArticuloID is None:
-			raise ValueError("ContpaqArticuloID es obligatorio")
-
-		with self.get_connection() as conn:
-			cursor = conn.execute(
-				"SELECT StockActual FROM articulostocks "
-				"WHERE NetvyArticuloID = ? AND ContpaqArticuloID = ?",
-				(articulo_logistica.NetvyArticuloID, articulo_logistica.ContpaqArticuloID),
-			)
-			row = cursor.fetchone()
-
-			# Si no existe registro previo, se considera cambio para forzar alta/actualización.
-			if row is None:
-				return True
-
-			stock_actual_db = row[0]
-			return stock_actual_db != articulo_logistica.StockActual

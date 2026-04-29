@@ -22,7 +22,7 @@
         "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
         "DRIVER":"{SQL Server}",
         "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
-        "DATABASE":"adPRUEBAS",
+        "DATABASE":"adREVISION",
         "Trusted_Connection":"no",
         "SQL_USER":"sa",
         "SQL_PASSWORD":"CONTPAQI2026"

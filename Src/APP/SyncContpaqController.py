@@ -6,6 +6,7 @@ import win32evtlogutil
 
 from APP import init
 from INF.SQLLiteRepository import SQLLiteRepository
+from INF.SQLLiteStockRepository import SQLLiteStockRepository
 from INF.ApiNetvyRepository import ApiNetvyRepository
 from INF.SDKContpaqRepository import SDKContpaqRepository
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
@@ -31,9 +32,10 @@ class SyncContpaqController:
 		self._mailings_actualizar_contpaq = []
 		self._pending_sync_dates = {}
 
-		self._sqllite  = SQLLiteRepository(config["SQLLITE"])
-		self._netvy    = ApiNetvyRepository(config["NETVY"])
-		self._contpaq  = SDKContpaqRepository(config["CONTPAQ"])
+		self._sqllite       = SQLLiteRepository(config["SQLLITE"])
+		self._sqllite_stock = SQLLiteStockRepository(config["SQLLITE_STOCK"])
+		self._netvy         = ApiNetvyRepository(config["NETVY"])
+		self._contpaq       = SDKContpaqRepository(config["CONTPAQ"])
 
 		# Fechas de última sincronización (se cargan en init())
 		self.fecha_mailing_netvy                 = None
@@ -55,6 +57,7 @@ class SyncContpaqController:
 
 		# 2. Inicializar SQLite (crea el archivo y las tablas si no existen)
 		self._sqllite.init()
+		self._sqllite_stock.init()
 
 		# 3. Asegurar registros base en FechaSincronizacion
 		self._sqllite.asegurar_fechas_sincronizacion()
@@ -473,10 +476,9 @@ class SyncContpaqController:
 
 			candidatos_con_cambio = []
 			for articulo_logistica in articulos_logistica.creacion_modificar_borrar:
-				fecha_actual = self._normalizar_fecha(datetime.now())
 				try:
 					self._contpaq.getLogisticArticleStock(articulo_logistica)
-					tiene_cambio = self._sqllite.getStockChange(articulo_logistica)
+					tiene_cambio = self._sqllite_stock.getStockChange(articulo_logistica)
 					if tiene_cambio:
 						candidatos_con_cambio.append(articulo_logistica)
 				except Exception as ex:
@@ -484,45 +486,17 @@ class SyncContpaqController:
 						f"Sincronización de stock falló durante lectura/comparación "
 						f"(NetvyArticuloID={articulo_logistica.NetvyArticuloID}, ContpaqArticuloID={articulo_logistica.ContpaqArticuloID}): {ex}"
 					)
-					self._sqllite.crear_historico(
-						"Articulo",
-						articulo_logistica.NetvyArticuloID or 0,
-						articulo_logistica.ContpaqArticuloID or 0,
-						fecha_actual,
-						1,
-						"A",
-						str(ex),
-					)
 
 			articulos_logistica.creacion_modificar_borrar = candidatos_con_cambio
 
 			for articulo_logistica in articulos_logistica.creacion_modificar_borrar:
-				fecha_actual = self._normalizar_fecha(datetime.now())
 				try:
 					self._netvy.updateLogisticArticle(articulo_logistica)
-					self._sqllite.createUpdateLogisticArticle(articulo_logistica)
-					self._sqllite.crear_historico(
-						"Articulo",
-						articulo_logistica.NetvyArticuloID or 0,
-						articulo_logistica.ContpaqArticuloID or 0,
-						fecha_actual,
-						1,
-						"A",
-						"Actualizado con exito",
-					)
+					self._sqllite_stock.createUpdateLogisticArticle(articulo_logistica)
 				except Exception as ex:
 					self._log_error(
 						f"updateLogisticArticle Netvy falló "
 						f"(NetvyArticuloID={articulo_logistica.NetvyArticuloID}, ContpaqArticuloID={articulo_logistica.ContpaqArticuloID}): {ex}"
-					)
-					self._sqllite.crear_historico(
-						"Articulo",
-						articulo_logistica.NetvyArticuloID or 0,
-						articulo_logistica.ContpaqArticuloID or 0,
-						fecha_actual,
-						1,
-						"A",
-						str(ex),
 					)
 		finally:
 			self._log_info("[Contpaq -> Netvy] Fin de sincronización de stock logístico")

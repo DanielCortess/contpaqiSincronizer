@@ -14,6 +14,10 @@
         "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
         "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqi.db"
     },
+    "SQLLITE_STOCK":{
+        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqiStock.db"
+    },
     "CONTPAQ":{
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
         "USER":"SUPERVISOR",
@@ -22,7 +26,7 @@
         "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
         "DRIVER":"{SQL Server}",
         "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
-        "DATABASE":"adPRUEBAS",
+        "DATABASE":"adREVISION",
         "Trusted_Connection":"no",
         "SQL_USER":"sa",
         "SQL_PASSWORD":"CONTPAQI2026"

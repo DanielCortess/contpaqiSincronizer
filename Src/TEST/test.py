@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -361,7 +362,10 @@ class test(unittest.TestCase):
 			config = json.load(config_file)
 
 		controller = SyncContpaqController(config)
-		controller.run()
+		controller.init()
+		while True:
+			controller._sincronizar()
+			time.sleep(controller._interval)
 
 
 if __name__ == "__main__":
