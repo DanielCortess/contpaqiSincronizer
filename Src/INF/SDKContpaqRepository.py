@@ -207,6 +207,8 @@ class SDKContpaqRepository:
 		self.sdk_path = config.get("PATH")
 		self.sdk_user = config.get("USER", "SUPERVISOR")
 		self.sdk_password = config.get("PASSWORD", "")
+		self.contabilidad_user = config.get("CONTABILIDAD_USER", "")
+		self.contabilidad_password = config.get("CONTABILIDAD_PASSWORD", "")
 		self.ruta_empresa = config.get("RUTAEMPRESA")
 		self.nombre_paq = config.get("NOMBRE_PAQ", "CONTPAQ I COMERCIAL")
 
@@ -745,6 +747,16 @@ class SDKContpaqRepository:
 			sdk.fTerminaSDK()
 			os.chdir(cwd_original)
 			raise Exception(f"Error fSetNombrePAQ: código {result}")
+
+		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
+		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
+		if self.contabilidad_user:
+			if hasattr(sdk, "fInicioSesionContabilidadSDK"):
+				sdk.fInicioSesionContabilidadSDK.restype = None
+				sdk.fInicioSesionContabilidadSDK(
+					self.contabilidad_user.encode("latin-1"),
+					self.contabilidad_password.encode("latin-1"),
+				)
 
 		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
 		if result != 0:

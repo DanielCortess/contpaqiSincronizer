@@ -22,6 +22,8 @@
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
         "USER":"SUPERVISOR",
         "PASSWORD":"",
+        "CONTABILIDAD_USER":"SUPERVISOR",
+        "CONTABILIDAD_PASSWORD":"",
         "RUTAEMPRESA": "C:\\Compac\\Empresas\\adPRUEBAS",
         "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
         "DRIVER":"{SQL Server}",
