@@ -207,8 +207,11 @@ class SDKContpaqRepository:
 		self.sdk_path = config.get("PATH")
 		self.sdk_user = config.get("USER", "SUPERVISOR")
 		self.sdk_password = config.get("PASSWORD", "")
-		self.empresa_id = config.get("EMPRESA_ID", 2)
+		self.ruta_empresa = config.get("RUTAEMPRESA")
 		self.nombre_paq = config.get("NOMBRE_PAQ", "CONTPAQ I COMERCIAL")
+
+		if not self.ruta_empresa:
+			raise ValueError("config debe incluir la llave RUTAEMPRESA con la ruta de la empresa")
 
 		# Validar conexión al inicializar
 		self._get_connection()
@@ -743,25 +746,7 @@ class SDKContpaqRepository:
 			os.chdir(cwd_original)
 			raise Exception(f"Error fSetNombrePAQ: código {result}")
 
-		# Buscar la empresa por ID iterando con fPosPrimerEmpresa / fPosSiguienteEmpresa
-		empresa_id_buf = c_int(0)
-		nombre_buf = create_string_buffer(256)
-		dir_buf = create_string_buffer(256)
-		ruta_empresa = None
-
-		res = sdk.fPosPrimerEmpresa(byref(empresa_id_buf), nombre_buf, dir_buf)
-		while res == 0:
-			if empresa_id_buf.value == self.empresa_id:
-				ruta_empresa = dir_buf.value.decode("latin-1")
-				break
-			res = sdk.fPosSiguienteEmpresa(byref(empresa_id_buf), nombre_buf, dir_buf)
-
-		if not ruta_empresa:
-			sdk.fTerminaSDK()
-			os.chdir(cwd_original)
-			raise Exception(f"No se encontró empresa con ID {self.empresa_id}")
-
-		result = sdk.fAbreEmpresa(ruta_empresa.encode("latin-1"))
+		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
 		if result != 0:
 			sdk.fTerminaSDK()
 			os.chdir(cwd_original)

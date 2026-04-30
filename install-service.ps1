@@ -78,6 +78,19 @@ if ($LASTEXITCODE -ne 0) {
     throw "Fallo la instalacion del servicio."
 }
 
+# Asegurar permisos de escritura en la carpeta de datos para la cuenta del servicio (LocalSystem)
+$dataFolder = "C:\ProgramData\SincronizadorContpaqi"
+if (-not (Test-Path $dataFolder)) {
+    New-Item -ItemType Directory -Force -Path $dataFolder | Out-Null
+}
+$acl = Get-Acl $dataFolder
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+    "NT AUTHORITY\SYSTEM", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
+)
+$acl.SetAccessRule($rule)
+Set-Acl $dataFolder $acl
+Write-Host "Permisos de escritura asegurados en: $dataFolder"
+
 if ($useExe) {
     & $ServiceExe start
 }

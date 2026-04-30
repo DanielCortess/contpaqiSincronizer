@@ -22,11 +22,11 @@
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
         "USER":"SUPERVISOR",
         "PASSWORD":"",
-        "EMPRESA_ID": 2,
+        "RUTAEMPRESA": "C:\\Compac\\Empresas\\adPRUEBAS",
         "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
         "DRIVER":"{SQL Server}",
         "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
-        "DATABASE":"adREVISION",
+        "DATABASE":"adPRUEBAS",
         "Trusted_Connection":"no",
         "SQL_USER":"sa",
         "SQL_PASSWORD":"CONTPAQI2026"
