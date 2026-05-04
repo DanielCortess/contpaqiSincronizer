@@ -158,11 +158,9 @@ class SyncContpaqController:
 				if netvy_art.ArticuloID is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_netvy_id("Articulo", netvy_art.ArticuloID):
-					self._agregar_articulo_actualizar_contpaq_si_aplica(
-						netvy_art,
-						articulos_actualizar_contpaq,
-						articulos_actualizar_contpaq_ids,
-					)
+					if netvy_art.ArticuloID not in articulos_actualizar_contpaq_ids:
+						articulos_actualizar_contpaq.append({"netvy": netvy_art, "contpaq_id": None})
+						articulos_actualizar_contpaq_ids.add(netvy_art.ArticuloID)
 					continue
 				try:
 					contpaq_art = ContpaqArticuloAggregate(
@@ -196,11 +194,9 @@ class SyncContpaqController:
 				if netvy_mail.MailingID is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_netvy_id("Mailing", netvy_mail.MailingID):
-					self._agregar_mailing_actualizar_contpaq_si_aplica(
-						netvy_mail,
-						mailings_actualizar_contpaq,
-						mailings_actualizar_contpaq_ids,
-					)
+					if netvy_mail.MailingID not in mailings_actualizar_contpaq_ids:
+						mailings_actualizar_contpaq.append({"netvy": netvy_mail, "contpaq_id": None})
+						mailings_actualizar_contpaq_ids.add(netvy_mail.MailingID)
 					continue
 				try:
 					contpaq_mail = ContpaqMailingAggregate(
@@ -380,11 +376,9 @@ class SyncContpaqController:
 				if contpaq_art.CIDPRODUCTO is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_contpaq_id("Articulo", contpaq_art.CIDPRODUCTO):
-					self._agregar_articulo_actualizar_netvy_si_aplica(
-						contpaq_art,
-						articulos_actualizar_netvy,
-						articulos_actualizar_netvy_ids,
-					)
+					if contpaq_art.CIDPRODUCTO not in articulos_actualizar_netvy_ids:
+						articulos_actualizar_netvy.append({"contpaq": contpaq_art, "netvy_id": None})
+						articulos_actualizar_netvy_ids.add(contpaq_art.CIDPRODUCTO)
 					continue
 				try:
 					netvy_art = NetvyArticuloAggregate(
@@ -409,11 +403,9 @@ class SyncContpaqController:
 				if contpaq_mail.CIDCLIENTEPROVEEDOR is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_contpaq_id("Mailing", contpaq_mail.CIDCLIENTEPROVEEDOR):
-					self._agregar_mailing_actualizar_netvy_si_aplica(
-						contpaq_mail,
-						mailings_actualizar_netvy,
-						mailings_actualizar_netvy_ids,
-					)
+					if contpaq_mail.CIDCLIENTEPROVEEDOR not in mailings_actualizar_netvy_ids:
+						mailings_actualizar_netvy.append({"contpaq": contpaq_mail, "netvy_id": None})
+						mailings_actualizar_netvy_ids.add(contpaq_mail.CIDCLIENTEPROVEEDOR)
 					continue
 				try:
 					netvy_mail = NetvyMailingAggregate(
@@ -755,6 +747,17 @@ class SyncContpaqController:
 				if netvy_id is None:
 					continue
 
+				try:
+					netvy_art_actual = self._netvy.getArticleByID(netvy_id)
+					if self._son_equivalentes_articulos(contpaq_art, netvy_art_actual):
+						continue
+				except Exception as ex:
+					self._log_error(
+						f"Comparación para actualización de artículo (Contpaq->Netvy) falló "
+						f"(ContpaqID={contpaq_art.CIDPRODUCTO}, NetvyID={netvy_id}): {ex}"
+					)
+					continue
+
 				fecha_historico = self._normalizar_fecha(fecha_base or datetime.now())
 				try:
 					netvy_art = NetvyArticuloAggregate(
@@ -805,6 +808,17 @@ class SyncContpaqController:
 				if netvy_id is None:
 					netvy_id = self._sqllite.get_netvy_id_por_contpaq_id("Mailing", contpaq_mail.CIDCLIENTEPROVEEDOR)
 				if netvy_id is None:
+					continue
+
+				try:
+					netvy_mail_actual = self._netvy.getMailingByID(netvy_id)
+					if self._son_equivalentes_mailings(contpaq_mail, netvy_mail_actual):
+						continue
+				except Exception as ex:
+					self._log_error(
+						f"Comparación para actualización de mailing (Contpaq->Netvy) falló "
+						f"(ContpaqID={contpaq_mail.CIDCLIENTEPROVEEDOR}, NetvyID={netvy_id}): {ex}"
+					)
 					continue
 
 				fecha_historico = self._normalizar_fecha(fecha_base_mail or datetime.now())
@@ -864,6 +878,17 @@ class SyncContpaqController:
 				if contpaq_id is None:
 					continue
 
+				try:
+					contpaq_art_actual = self._contpaq.getArticleByID(contpaq_id)
+					if self._son_equivalentes_articulos(contpaq_art_actual, netvy_art):
+						continue
+				except Exception as ex:
+					self._log_error(
+						f"Comparación para actualización de artículo (Netvy->Contpaq) falló "
+						f"(NetvyID={netvy_art.ArticuloID}, ContpaqID={contpaq_id}): {ex}"
+					)
+					continue
+
 				fecha_historico = self._normalizar_fecha(fecha_base or datetime.now())
 				try:
 					contpaq_art = ContpaqArticuloAggregate(
@@ -914,6 +939,17 @@ class SyncContpaqController:
 				if contpaq_id is None:
 					contpaq_id = self._sqllite.get_contpaq_id_por_netvy_id("Mailing", netvy_mail.MailingID)
 				if contpaq_id is None:
+					continue
+
+				try:
+					contpaq_mail_actual = self._contpaq.getMailingByID(contpaq_id)
+					if self._son_equivalentes_mailings(contpaq_mail_actual, netvy_mail):
+						continue
+				except Exception as ex:
+					self._log_error(
+						f"Comparación para actualización de mailing (Netvy->Contpaq) falló "
+						f"(NetvyID={netvy_mail.MailingID}, ContpaqID={contpaq_id}): {ex}"
+					)
 					continue
 
 				fecha_historico = self._normalizar_fecha(fecha_base_mail or datetime.now())

@@ -1,6 +1,7 @@
 import ctypes
 import os
 import pyodbc
+import time
 from ctypes import c_int, c_double, c_char, Structure, byref, create_string_buffer, WinDLL
 from datetime import datetime, date
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
@@ -286,17 +287,30 @@ class SDKContpaqRepository:
 		Establece y retorna una conexión a SQL Server.
 		Usa autenticación Windows si Trusted_Connection=yes, o SQL Server si se proporcionan SQL_USER y SQL_PASSWORD.
 		"""
-		try:
-			if self.trusted_connection.lower() == "yes":
-				connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};Trusted_Connection=yes;"
-			else:
-				if not self.sql_user:
-					raise ValueError("Se requiere SQL_USER cuando Trusted_Connection no es 'yes'")
-				connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};UID={self.sql_user};PWD={self.sql_password};"
-			conn = pyodbc.connect(connection_string)
-			return conn
-		except Exception as e:
-			raise Exception(f"Error al conectar a SQL Server: {str(e)}")
+		if self.trusted_connection.lower() == "yes":
+			connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};Trusted_Connection=yes;"
+		else:
+			if not self.sql_user:
+				raise ValueError("Se requiere SQL_USER cuando Trusted_Connection no es 'yes'")
+			connection_string = f"Driver={self.driver};Server={self.server};Database={self.database};UID={self.sql_user};PWD={self.sql_password};"
+
+		max_reintentos = 6
+		espera_segundos = 10
+		ultimo_error = None
+
+		for intento in range(1, max_reintentos + 1):
+			try:
+				return pyodbc.connect(connection_string)
+			except pyodbc.Error as e:
+				ultimo_error = e
+				if intento == max_reintentos:
+					break
+				time.sleep(espera_segundos)
+
+		raise Exception(
+			f"Error al conectar a SQL Server después de {max_reintentos} intentos "
+			f"(esperando {espera_segundos} segundos entre intentos): {str(ultimo_error)}"
+		)
 
 	def getArticles(self, fecha):
 		"""
@@ -750,13 +764,13 @@ class SDKContpaqRepository:
 
 		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
 		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
-		if self.contabilidad_user:
-			if hasattr(sdk, "fInicioSesionContabilidadSDK"):
-				sdk.fInicioSesionContabilidadSDK.restype = None
-				sdk.fInicioSesionContabilidadSDK(
-					self.contabilidad_user.encode("latin-1"),
-					self.contabilidad_password.encode("latin-1"),
-				)
+		# if self.contabilidad_user:
+		# 	if hasattr(sdk, "fInicioSesionContabilidadSDK"):
+		# 		sdk.fInicioSesionContabilidadSDK.restype = None
+		# 		sdk.fInicioSesionContabilidadSDK(
+		# 			self.contabilidad_user.encode("latin-1"),
+		# 			self.contabilidad_password.encode("latin-1"),
+		# 		)
 
 		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
 		if result != 0:

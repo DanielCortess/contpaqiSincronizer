@@ -3,20 +3,28 @@
         "TIME": 3
     },
     "NETVY":{
-        "URLBASE":"localhost",
-        "USER":"testPaisEmpresa1706@gmail.com",
-        "PASSWORD":"ferWUk",
-        "LICENSE":"NETVY-TEST-LOCAL",
-        "CODIGOFAMILIA":"FAMGE",
-        "CODIGOMONEDA":"MXN"
+        "URLBASE2":"localhost",
+        "USER2":"testPaisEmpresa1706@gmail.com",
+        "PASSWORD2":"ferWUk",
+        "LICENSE2":"NETVY-TEST-LOCAL",
+        "CODIGOFAMILIA2":"FAMGE",
+        "CODIGOMONEDA2":"MXN",
+        "URLBASE": "https://coapi.netvy.net",
+        "USER": "sincro@sincro.com",
+        "PASSWORD": "123",
+        "LICENSE": "8756b7af-4549-413b-b022-7c43d73e9c30",
+        "CODIGOFAMILIA": "FAMGE",
+        "CODIGOMONEDA": "MXN"
     },
     "SQLLITE":{
-        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
-        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqi.db"
+        "DBPATH":"C:\\Users\\Usuario\\Documents\\ClienteBD\\SQLLITESincronizadorContpaqi.db",
+        "DBPATH2":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
+        "DBPATH3":"./LocalDB/SQLLITESincronizadorContpaqi.db"
     },
     "SQLLITE_STOCK":{
-        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
-        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqiStock.db"
+        "DBPATH":"C:\\Users\\Usuario\\Documents\\ClienteBD\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATH2":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATH3":"./LocalDB/SQLLITESincronizadorContpaqiStock.db"
     },
     "CONTPAQ":{
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
