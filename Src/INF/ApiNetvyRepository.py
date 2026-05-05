@@ -124,6 +124,7 @@ class ApiNetvyRepository:
 			Activo=data.get("Activo"),
 			TipoArticuloID=data.get("TipoArticuloID"),
 			Codigo=data.get("Codigo"),
+			PrecioVenta=data.get("PrecioVenta"),
 			Observacion=data.get("Observacion"),
 			Descripcion=data.get("Descripcion"),
 			CodigoAlternativo=data.get("CodigoAlternativo"),
@@ -654,6 +655,7 @@ class ApiNetvyRepository:
 			"Codigo": articulo.Codigo or "",
 			"Nombre": articulo.Nombre or "",
 			"FamiliaID": init.NetvyFamiliaID,
+			"PrecioVenta": articulo.PrecioVenta if articulo.PrecioVenta is not None else 0,
 			"Descripcion": articulo.Descripcion or ""
 		}
 
@@ -706,6 +708,7 @@ class ApiNetvyRepository:
 			"ArticuloID": articulo.ArticuloID,
 			"Codigo": articulo.Codigo or "",
 			"Nombre": articulo.Nombre or "",
+			"PrecioVenta": articulo.PrecioVenta if articulo.PrecioVenta is not None else 0,
 		}
 
 		response = requests.patch(url, json=body, headers=headers)

@@ -2,6 +2,7 @@ import ctypes
 import os
 import pyodbc
 import time
+import win32com.client
 from ctypes import c_int, c_double, c_char, Structure, byref, create_string_buffer, WinDLL
 from datetime import datetime, date
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
@@ -210,6 +211,8 @@ class SDKContpaqRepository:
 		self.sdk_password = config.get("PASSWORD", "")
 		self.contabilidad_user = config.get("CONTABILIDAD_USER", "")
 		self.contabilidad_password = config.get("CONTABILIDAD_PASSWORD", "")
+		self.contabilidad_empresa = config.get("CONTABILIDAD_EMPRESA", "")
+		self._sesion_com = None
 		self.ruta_empresa = config.get("RUTAEMPRESA")
 		self.nombre_paq = config.get("NOMBRE_PAQ", "CONTPAQ I COMERCIAL")
 
@@ -416,7 +419,7 @@ class SDKContpaqRepository:
 			cursor = conn.cursor()
 
 			query = """
-			SELECT CIDPRODUCTO, CCODIGOPRODUCTO, CNOMBREPRODUCTO, CTIPOPRODUCTO,
+			SELECT CIDPRODUCTO, CCODIGOPRODUCTO, CNOMBREPRODUCTO, CPRECIO1, CTIPOPRODUCTO,
 			       CFECHAALTAPRODUCTO, CFECHABAJA, CTIMESTAMP
 			FROM dbo.admProductos
 			WHERE CTIMESTAMP > ? AND CTIMESTAMP <= ?
@@ -448,10 +451,11 @@ class SDKContpaqRepository:
 			CIDPRODUCTO=row[0],
 			CCODIGOPRODUCTO=row[1],
 			CNOMBREPRODUCTO=row[2],
-			CTIPOPRODUCTO=row[3],
-			CFECHAALTAPRODUCTO=row[4],
-			CFECHABAJA=row[5],
-			CTIMESTAMP=row[6]
+			CPRECIO1=row[3],
+			CTIPOPRODUCTO=row[4],
+			CFECHAALTAPRODUCTO=row[5],
+			CFECHABAJA=row[6],
+			CTIMESTAMP=row[7]
 		)
 
 	def getMailings(self, fecha):
@@ -592,7 +596,7 @@ class SDKContpaqRepository:
 			cursor = conn.cursor()
 
 			query = """
-			SELECT TOP 1 CIDPRODUCTO, CCODIGOPRODUCTO, CNOMBREPRODUCTO, CTIPOPRODUCTO,
+			SELECT TOP 1 CIDPRODUCTO, CCODIGOPRODUCTO, CNOMBREPRODUCTO, CPRECIO1, CTIPOPRODUCTO,
 			       CFECHAALTAPRODUCTO, CFECHABAJA, CTIMESTAMP
 			FROM dbo.admProductos
 			WHERE CIDPRODUCTO = ?
@@ -764,13 +768,8 @@ class SDKContpaqRepository:
 
 		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
 		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
-		# if self.contabilidad_user:
-		# 	if hasattr(sdk, "fInicioSesionContabilidadSDK"):
-		# 		sdk.fInicioSesionContabilidadSDK.restype = None
-		# 		sdk.fInicioSesionContabilidadSDK(
-		# 			self.contabilidad_user.encode("latin-1"),
-		# 			self.contabilidad_password.encode("latin-1"),
-		# 		)
+		if self.contabilidad_user:
+			self._autenticar_contabilidad_com()
 
 		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
 		if result != 0:
@@ -780,6 +779,41 @@ class SDKContpaqRepository:
 
 		return sdk, cwd_original
 
+	def _autenticar_contabilidad_com(self):
+		"""
+		Abre una sesión COM con SDKCONTPAQNG.exe (TSdkSesion) para autenticar
+		las credenciales de Contabilidad de forma silenciosa y evitar el diálogo
+		de login emergente al abrir empresas vinculadas.
+		Guarda la sesión en self._sesion_com para cerrarla luego en _cerrar_sdk.
+		"""
+		try:
+			# TSdkSesion es el ProgID correcto del objeto COM (no TSdkSesionClass,
+			# que es el nombre del wrapper autogenerado por Visual Studio en C#).
+			sesion = win32com.client.Dispatch("SDKCONTPAQNGLib.TSdkSesion")
+
+			if sesion.conexionActiva == 0:
+				sesion.iniciaConexion()
+
+			if sesion.ingresoUsuario == 0 and sesion.conexionActiva == 1:
+				sesion.firmaUsuarioParams(self.contabilidad_user, self.contabilidad_password)
+
+			if sesion.ingresoUsuario == 1 and sesion.conexionActiva == 1:
+				if self.contabilidad_empresa:
+					result = sesion.abreEmpresa(self.contabilidad_empresa)
+					if result == 0:
+						raise Exception(
+							f"COM TSdkSesion: abreEmpresa('{self.contabilidad_empresa}') falló (result=0)"
+						)
+			else:
+				raise Exception(
+					f"COM TSdkSesion: autenticación fallida para usuario '{self.contabilidad_user}' "
+					f"(conexionActiva={sesion.conexionActiva}, ingresoUsuario={sesion.ingresoUsuario})"
+				)
+
+			self._sesion_com = sesion
+		except Exception as ex:
+			raise Exception(f"Error al autenticar Contabilidad via COM: {ex}")
+
 	def _cerrar_sdk(self, sdk, cwd_original):
 		"""Cierra la empresa, termina el SDK y restaura el directorio de trabajo."""
 		try:
@@ -787,6 +821,14 @@ class SDKContpaqRepository:
 			sdk.fTerminaSDK()
 		finally:
 			os.chdir(cwd_original)
+			if self._sesion_com is not None:
+				try:
+					self._sesion_com.cierraEmpresa()
+					self._sesion_com.finalizaConexion()
+				except Exception:
+					pass
+				finally:
+					self._sesion_com = None
 
 	def _leer_error_sdk(self, sdk, codigo_error):
 		"""Devuelve el mensaje de error en texto legible usando fError de la DLL."""
@@ -814,6 +856,7 @@ class SDKContpaqRepository:
 			producto = tProducto()
 			producto.cCodigoProducto    = (articulo.CCODIGOPRODUCTO or "")[:30].encode("latin-1")
 			producto.cNombreProducto    = (articulo.CNOMBREPRODUCTO or "")[:60].encode("latin-1")
+			producto.cPrecio1           = float(articulo.CPRECIO1 or 0)
 			producto.cTipoProducto      = articulo.CTIPOPRODUCTO if articulo.CTIPOPRODUCTO is not None else 1
 			producto.cFechaAltaProducto = date.today().strftime("%m/%d/%Y").encode("latin-1")
 			producto.cStatusProducto    = 1
@@ -1050,6 +1093,12 @@ class SDKContpaqRepository:
 				if result != 0:
 					msg = self._leer_error_sdk(sdk, result)
 					raise Exception(f"Error fSetDatoProducto(CNOMBREPRODUCTO): código {result} — {msg}")
+
+			if articulo.CPRECIO1 is not None:
+				result = sdk.fSetDatoProducto(b"CPRECIO1", str(float(articulo.CPRECIO1)).encode("latin-1"))
+				if result != 0:
+					msg = self._leer_error_sdk(sdk, result)
+					raise Exception(f"Error fSetDatoProducto(CPRECIO1): código {result} — {msg}")
 
 			result = sdk.fGuardaProducto()
 			if result != 0:

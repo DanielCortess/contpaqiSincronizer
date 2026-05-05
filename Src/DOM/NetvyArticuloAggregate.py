@@ -13,6 +13,7 @@ class NetvyArticuloAggregate:
 		Activo=None,
 		TipoArticuloID=None,
 		Codigo=None,
+		PrecioVenta=None,
 		Observacion=None,
 		Descripcion=None,
 		CodigoAlternativo=None,
@@ -29,6 +30,7 @@ class NetvyArticuloAggregate:
 		self.Activo = Activo
 		self.TipoArticuloID = TipoArticuloID
 		self.Codigo = Codigo
+		self.PrecioVenta = PrecioVenta
 		self.Observacion = Observacion
 		self.Descripcion = Descripcion
 		self.CodigoAlternativo = CodigoAlternativo

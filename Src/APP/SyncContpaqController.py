@@ -166,6 +166,7 @@ class SyncContpaqController:
 					contpaq_art = ContpaqArticuloAggregate(
 						CCODIGOPRODUCTO=netvy_art.Codigo,
 						CNOMBREPRODUCTO=netvy_art.Nombre,
+						CPRECIO1=netvy_art.PrecioVenta,
 						CTIPOPRODUCTO=1,
 					)
 					self._contpaq.createArticle(contpaq_art)
@@ -384,6 +385,7 @@ class SyncContpaqController:
 					netvy_art = NetvyArticuloAggregate(
 						Codigo=contpaq_art.CCODIGOPRODUCTO,
 						Nombre=contpaq_art.CNOMBREPRODUCTO,
+						PrecioVenta=contpaq_art.CPRECIO1,
 						Descripcion=contpaq_art.CNOMBREPRODUCTO,
 						Activo=True,
 					)
@@ -497,6 +499,7 @@ class SyncContpaqController:
 		return (
 			(contpaq_art.CCODIGOPRODUCTO or "") == (netvy_art.Codigo or "")
 			and (contpaq_art.CNOMBREPRODUCTO or "") == (netvy_art.Nombre or "")
+			and float(contpaq_art.CPRECIO1 or 0) == float(netvy_art.PrecioVenta or 0)
 		)
 
 	def _son_equivalentes_mailings(self, contpaq_mail, netvy_mail):
@@ -764,6 +767,7 @@ class SyncContpaqController:
 						ArticuloID=netvy_id,
 						Codigo=contpaq_art.CCODIGOPRODUCTO,
 						Nombre=contpaq_art.CNOMBREPRODUCTO,
+						PrecioVenta=contpaq_art.CPRECIO1,
 					)
 					self._netvy.updateArticle(netvy_art)
 					fecha_sync = fecha_historico
@@ -895,6 +899,7 @@ class SyncContpaqController:
 						CIDPRODUCTO=contpaq_id,
 						CCODIGOPRODUCTO=netvy_art.Codigo,
 						CNOMBREPRODUCTO=netvy_art.Nombre,
+						CPRECIO1=netvy_art.PrecioVenta,
 					)
 					self._contpaq.updateArticle(contpaq_art)
 					fecha_sync = fecha_historico
