@@ -772,6 +772,7 @@ class SDKContpaqRepository:
 			self._autenticar_contabilidad_com()
 
 		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
+		self._cerrar_sesion_contabilidad_com()
 		if result != 0:
 			sdk.fTerminaSDK()
 			os.chdir(cwd_original)
@@ -814,6 +815,16 @@ class SDKContpaqRepository:
 		except Exception as ex:
 			raise Exception(f"Error al autenticar Contabilidad via COM: {ex}")
 
+	def _cerrar_sesion_contabilidad_com(self):
+		if self._sesion_com is not None:
+			try:
+				self._sesion_com.cierraEmpresa()
+				self._sesion_com.finalizaConexion()
+			except Exception:
+				pass
+			finally:
+				self._sesion_com = None
+
 	def _cerrar_sdk(self, sdk, cwd_original):
 		"""Cierra la empresa, termina el SDK y restaura el directorio de trabajo."""
 		try:
@@ -821,14 +832,7 @@ class SDKContpaqRepository:
 			sdk.fTerminaSDK()
 		finally:
 			os.chdir(cwd_original)
-			if self._sesion_com is not None:
-				try:
-					self._sesion_com.cierraEmpresa()
-					self._sesion_com.finalizaConexion()
-				except Exception:
-					pass
-				finally:
-					self._sesion_com = None
+			self._cerrar_sesion_contabilidad_com()
 
 	def _leer_error_sdk(self, sdk, codigo_error):
 		"""Devuelve el mensaje de error en texto legible usando fError de la DLL."""
