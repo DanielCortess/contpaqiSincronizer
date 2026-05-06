@@ -760,19 +760,22 @@ class SDKContpaqRepository:
 			self.sdk_password.encode("latin-1"),
 		)
 
+		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
+		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
+		if self.contabilidad_user:
+			sdk.fInicioSesionSDKCONTPAQI(
+			self.contabilidad_user.encode("latin-1"),
+			self.contabilidad_password.encode("latin-1"),
+		)
+
 		result = sdk.fSetNombrePAQ(self.nombre_paq.encode("latin-1"))
 		if result != 0:
 			sdk.fTerminaSDK()
 			os.chdir(cwd_original)
 			raise Exception(f"Error fSetNombrePAQ: código {result}")
 
-		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
-		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
-		if self.contabilidad_user:
-			self._autenticar_contabilidad_com()
-
 		result = sdk.fAbreEmpresa(self.ruta_empresa.encode("latin-1"))
-		self._cerrar_sesion_contabilidad_com()
+		# self._cerrar_sesion_contabilidad_com()
 		if result != 0:
 			sdk.fTerminaSDK()
 			os.chdir(cwd_original)

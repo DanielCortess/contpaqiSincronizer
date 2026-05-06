@@ -20,6 +20,7 @@
     },
     "CONTPAQ":{
         "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
+        "RUTACOM":"C:\\Program Files (x86)\\Compac\\SDK",
         "USER":"SUPERVISOR",
         "PASSWORD":"",
         "CONTABILIDAD_USER":"",
