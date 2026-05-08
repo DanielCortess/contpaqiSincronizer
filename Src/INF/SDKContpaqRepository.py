@@ -763,7 +763,7 @@ class SDKContpaqRepository:
 		# Si hay credenciales de Contabilidad configuradas, autenticar en silencio
 		# para evitar el diálogo de login que aparece al abrir empresas vinculadas.
 		if self.contabilidad_user:
-			sdk.fInicioSesionSDKCONTPAQI(
+			sdk.fInicioSesionSDKCONTPAQi(
 			self.contabilidad_user.encode("latin-1"),
 			self.contabilidad_password.encode("latin-1"),
 		)
