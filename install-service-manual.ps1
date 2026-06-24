@@ -10,6 +10,10 @@ Write-Host "[2] Instalando..."
 & $EXE --startup auto install 2>&1
 Start-Sleep -Seconds 2
 
+Write-Host "[2.1] Configurando recuperación automática..."
+& sc.exe failure SincronizadorContpaqiService reset= 86400 actions= restart/5000/restart/15000/restart/60000 2>&1
+& sc.exe failureflag SincronizadorContpaqiService 1 2>&1
+
 Write-Host "[3] Iniciando..."
 & $EXE start 2>&1
 Start-Sleep -Seconds 3

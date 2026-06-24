@@ -14,6 +14,8 @@ echo [3] Creando nuevo servicio...
 sc create SincronizadorContpaqiService binPath= "%EXE_PATH%" start= auto DisplayName= "Sincronizador Contpaqi"
 
 sc description SincronizadorContpaqiService "Sincroniza datos entre Netvy y Contpaqi."
+sc failure SincronizadorContpaqiService reset= 86400 actions= restart/5000/restart/15000/restart/60000 >nul
+sc failureflag SincronizadorContpaqiService 1 >nul
 
 timeout /t 2 >nul
 

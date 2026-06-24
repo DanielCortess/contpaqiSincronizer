@@ -73,6 +73,10 @@ if (-not $svc) {
     exit 1
 }
 
+Log "Configurando recuperación automática de servicio..."
+& sc.exe failure SincronizadorContpaqiService reset= 86400 actions= restart/5000/restart/15000/restart/60000 2>&1 | ForEach { Log "  $_" }
+& sc.exe failureflag SincronizadorContpaqiService 1 2>&1 | ForEach { Log "  $_" }
+
 $reg = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\services\SincronizadorContpaqiService
 Log "StartType: $($reg.Start) (2=Auto, 3=Manual, 4=Disabled)"
 

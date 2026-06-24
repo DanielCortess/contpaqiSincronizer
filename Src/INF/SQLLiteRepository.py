@@ -16,6 +16,7 @@ _REGISTROS_REQUERIDOS = [
 	{"Tabla": "Articulo",            "Programa": "Contpaq"},
 	{"Tabla": "PedidoVentaCabecera", "Programa": "Contpaq"},
 	{"Tabla": "PedidoVentaLinea",    "Programa": "Contpaq"},
+	{"Tabla": "Factura",             "Programa": "Contpaq"},
 ]
 
 

@@ -1,5 +1,6 @@
 ﻿import time
 import threading
+import traceback
 from datetime import datetime
 import win32evtlog
 import win32evtlogutil
@@ -13,6 +14,7 @@ from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
 from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
 from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
 from DOM.ContpaqPedidoVentaLineaAggregate import ContpaqPedidoVentaLineaAggregate
+from DOM.NetvyAlbaranVentaAggregate import NetvyAlbaranVentaAggregate
 from DOM.NetvyArticuloAggregate import NetvyArticuloAggregate
 from DOM.NetvyMailingAggregate import NetvyMailingAggregate
 
@@ -46,6 +48,7 @@ class SyncContpaqController:
 		self.fecha_articulo_contpaq              = None
 		self.fecha_pedido_venta_cabecera_contpaq = None
 		self.fecha_pedido_venta_linea_contpaq    = None
+		self.fecha_factura_contpaq               = None
 
 	def init(self):
 		# 1. Cargar variables globales de Netvy (FamiliaID, MonedaID, token)
@@ -78,7 +81,22 @@ class SyncContpaqController:
 			if stop_event is not None and stop_event.is_set():
 				self._log_info("Se recibió señal de parada. Finalizando servicio.")
 				return
-			self._sincronizar()
+			try:
+				self._sincronizar()
+			except Exception as ex:
+				# Evita que una excepción de Python derribe el hilo principal del servicio.
+				self._log_error(f"Error no controlado en ciclo de sincronización: {ex}")
+				self._log_error(traceback.format_exc())
+				if stop_event is not None and stop_event.is_set():
+					self._log_info("Se recibió señal de parada después de error. Finalizando servicio.")
+					return
+				# Backoff para evitar bucle de fallas rápidas.
+				retry_wait = max(5, int(self._interval)) if isinstance(self._interval, (int, float)) else 10
+				if stop_event is None:
+					time.sleep(retry_wait)
+				else:
+					stop_event.wait(retry_wait)
+				continue
 			if stop_event is None:
 				time.sleep(self._interval)
 			else:
@@ -354,6 +372,7 @@ class SyncContpaqController:
 		# 1. Obtener colecciones desde Contpaq
 		articulos_contpaq = None
 		mailings_contpaq  = None
+		facturas_contpaq  = None
 
 		try:
 			self._log_info(f"[Contpaq -> Netvy] Buscando artículos desde fecha: {self.fecha_articulo_contpaq}")
@@ -370,6 +389,14 @@ class SyncContpaqController:
 				self._log_info(f"[Contpaq -> Netvy] Mailings fechaHoraHasta recibida: {mailings_contpaq.fechaHoraHasta}")
 		except Exception as ex:
 			self._log_error(f"getMailings Contpaq falló: {ex}")
+
+		try:
+			self._log_info(f"[Contpaq -> Netvy] Buscando facturas desde fecha: {self.fecha_factura_contpaq}")
+			facturas_contpaq = self._contpaq.getInvoices(self.fecha_factura_contpaq)
+			if facturas_contpaq:
+				self._log_info(f"[Contpaq -> Netvy] Facturas fechaHoraHasta recibida: {facturas_contpaq.fechaHoraHasta}")
+		except Exception as ex:
+			self._log_error(f"getInvoices Contpaq falló: {ex}")
 
 		# 2. Crear artículos en Netvy
 		if articulos_contpaq:
@@ -427,6 +454,57 @@ class SyncContpaqController:
 					)
 					self._sqllite.crear_historico("Mailing", 0, contpaq_mail.CIDCLIENTEPROVEEDOR, self.fecha_mailing_contpaq, 1, "C", str(ex))
 
+		# 4. Crear facturas en Netvy mediante albarán + factura final
+		if facturas_contpaq:
+			for contpaq_fact in facturas_contpaq.creacion:
+				if contpaq_fact.CIDDOCUMENTO is None:
+					continue
+				if self._sqllite.existe_sincronizacion_por_contpaq_id("Factura", contpaq_fact.CIDDOCUMENTO):
+					continue
+
+				fecha_sync_factura = self._normalizar_fecha(
+					facturas_contpaq.fechaHoraHasta or self.fecha_factura_contpaq or datetime.now()
+				)
+
+				try:
+					netvy_albaran = self._mapear_factura_contpaq_a_netvy(contpaq_fact)
+					albaran_id = self._netvy.createDeliveryNote(netvy_albaran)
+					factura_netvy_id = self._netvy.createInvoiceFromDeliveryNote(
+						self._netvy.serie,
+						albaran_id,
+						contpaq_fact.CMETODOPAG,
+						self._to_float_safe(contpaq_fact.CTOTAL),
+					)
+					self._sqllite.crear_sincronizacion(
+						"Factura",
+						factura_netvy_id,
+						contpaq_fact.CIDDOCUMENTO,
+						fecha_sync_factura,
+					)
+					self._sqllite.crear_historico(
+						"Factura",
+						factura_netvy_id,
+						contpaq_fact.CIDDOCUMENTO,
+						fecha_sync_factura,
+						1,
+						"C",
+						"Se creó con éxito",
+					)
+				except Exception as ex:
+					self._log_error(
+						f"createInvoice Netvy falló "
+						f"(ContpaqDocumentoID={contpaq_fact.CIDDOCUMENTO}): {ex}"
+					)
+					self._sqllite.crear_historico(
+						"Factura",
+						0,
+						contpaq_fact.CIDDOCUMENTO,
+						fecha_sync_factura,
+						1,
+						"C",
+						str(ex),
+					)
+
 		self._log_info(
 			f"[Contpaq -> Netvy] Pendientes de actualización detectados: "
 			f"Articulos={len(articulos_actualizar_netvy)}, Mailings={len(mailings_actualizar_netvy)}"
@@ -436,8 +514,10 @@ class SyncContpaqController:
 			self._pending_sync_dates[("Articulo", "Contpaq", "fecha_articulo_contpaq")] = articulos_contpaq.fechaHoraHasta
 		if mailings_contpaq and mailings_contpaq.fechaHoraHasta:
 			self._pending_sync_dates[("Mailing", "Contpaq", "fecha_mailing_contpaq")] = mailings_contpaq.fechaHoraHasta
+		if facturas_contpaq and facturas_contpaq.fechaHoraHasta:
+			self._pending_sync_dates[("Factura", "Contpaq", "fecha_factura_contpaq")] = facturas_contpaq.fechaHoraHasta
 
-		# 4. Lanzar sincronización de stock logístico en hilo independiente
+		# 5. Lanzar sincronización de stock logístico en hilo independiente
 		self._iniciar_hilo_stock_logistico()
 
 		self._log_info("[Contpaq -> Netvy] Fin de sincronización")
@@ -642,6 +722,89 @@ class SyncContpaqController:
 			return datetime.strptime(s, "%m/%d/%Y %H:%M:%S.%f")
 		except ValueError:
 			return datetime.min
+
+	def _to_float_safe(self, value):
+		try:
+			return float(value or 0)
+		except (TypeError, ValueError):
+			return 0.0
+
+	def _to_string_safe(self, value):
+		if value is None:
+			return ""
+		return str(value)
+
+	def _fecha_netvy_yyyymmdd(self, fecha):
+		dt = self._to_datetime_safe(fecha)
+		if dt == datetime.min:
+			return ""
+		return dt.strftime("%Y%m%d")
+
+	def _fecha_netvy_datetime(self, fecha):
+		dt = self._to_datetime_safe(fecha)
+		if dt == datetime.min:
+			return ""
+		return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+	def _resolver_iva_netvy(self, porcentaje):
+		return "01" if abs(self._to_float_safe(porcentaje) - 16.0) < 0.0001 else ""
+
+	def _mapear_factura_contpaq_a_netvy(self, contpaq_fact):
+		if not self._netvy.serie:
+			raise ValueError("NETVY.SERIE es obligatorio para sincronizar facturas")
+		if not self._netvy.almacen:
+			raise ValueError("NETVY.ALMACEN es obligatorio para sincronizar facturas")
+		if not self._netvy.codigo_moneda:
+			raise ValueError("NETVY.CODIGOMONEDA es obligatorio para sincronizar facturas")
+
+		mailing_id = self._sqllite.get_netvy_id_por_contpaq_id(
+			"Mailing",
+			contpaq_fact.CIDCLIENTEPROVEEDOR,
+		)
+		if mailing_id is None:
+			raise ValueError(
+				f"No existe sincronización de Mailing para ContpaqID={contpaq_fact.CIDCLIENTEPROVEEDOR}"
+			)
+
+		lineas = []
+		for linea in contpaq_fact.LINEAS or []:
+			articulo_id = self._sqllite.get_netvy_id_por_contpaq_id("Articulo", linea.CIDPRODUCTO)
+			if articulo_id is None:
+				raise ValueError(
+					f"No existe sincronización de Articulo para ContpaqID={linea.CIDPRODUCTO}"
+				)
+
+			lineas.append(
+				{
+					"NumeroLinea": self._to_string_safe(linea.CNUMEROMOVIMIENTO),
+					"articuloIDErp": self._to_string_safe(articulo_id),
+					"Cantidad": self._to_string_safe(linea.CUNIDADES),
+					"Precio": self._to_string_safe(linea.CPRECIO),
+					"IVA": self._resolver_iva_netvy(linea.CPORCENTAJEIMPUESTO1),
+					"Importe": self._to_string_safe(linea.CTOTAL),
+				}
+			)
+
+		if not lineas:
+			raise ValueError(f"La factura {contpaq_fact.CIDDOCUMENTO} no tiene líneas para sincronizar")
+
+		return NetvyAlbaranVentaAggregate(
+			Serie=self._netvy.serie,
+			FechaAlbaran=self._fecha_netvy_yyyymmdd(contpaq_fact.CTIMESTAMP),
+			Almacen=self._netvy.almacen,
+			FechaHoraCreacion=self._fecha_netvy_datetime(contpaq_fact.CTIMESTAMP),
+			ProyectoOFID="",
+			ClienteFactura={
+				"MailingID": self._to_string_safe(mailing_id),
+			},
+			FormaPago=[
+				{
+					"Codigo": self._to_string_safe(contpaq_fact.CMETODOPAG),
+				}
+			],
+			Moneda=self._netvy.codigo_moneda,
+			Lineas=lineas,
+		)
 
 	def cleanUpdates(self):
 		removed_articulos_netvy = 0

@@ -7,6 +7,9 @@ from ctypes import c_int, c_double, c_char, Structure, byref, create_string_buff
 from datetime import datetime, date
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
 from DOM.ContpaqArticuloCollection import ContpaqArticuloCollection
+from DOM.ContpaqAlbaranVentaAggregate import ContpaqAlbaranVentaAggregate
+from DOM.ContpaqAlbaranVentaCollection import ContpaqAlbaranVentaCollection
+from DOM.ContpaqAlbaranVentaLineaAggregate import ContpaqAlbaranVentaLineaAggregate
 from DOM.ContpaqMailingAggregate import ContpaqMailingAggregate
 from DOM.ContpaqMailingCollection import ContpaqMailingCollection
 from DOM.ContpaqPedidoVentaCabeceraAggregate import ContpaqPedidoVentaCabeceraAggregate
@@ -580,6 +583,162 @@ class SDKContpaqRepository:
 		except Exception as e:
 			raise Exception(f"Error al obtener clientes de SQL Server: {str(e)}")
 
+	def getInvoices(self, fecha):
+		"""
+		Obtiene las facturas de Contpaq desde la fecha especificada.
+
+		Args:
+			fecha (str): Fecha en formato ISO, YYYYMMDD, YYYYMMDDHHmmSS o
+				YYYYMMDDHHmmSSMMM.
+
+		Returns:
+			ContpaqAlbaranVentaCollection: Colección de facturas con sus líneas.
+		"""
+		if not fecha or (isinstance(fecha, str) and fecha.strip() == ""):
+			return ContpaqAlbaranVentaCollection(
+				tabla="dbo.admDocumentos",
+				fechaHoraDesde=None,
+				fechaHoraHasta=None,
+				creacion=[]
+			)
+
+		try:
+			fecha_desde = self._parse_fecha(fecha)
+		except ValueError as e:
+			raise ValueError(f"Error al parsear fecha de facturas: {str(e)}")
+
+		fecha_hasta = self._get_fecha_hasta_invoices(fecha_desde)
+
+		if fecha_desde == fecha_hasta:
+			return ContpaqAlbaranVentaCollection(
+				tabla="dbo.admDocumentos",
+				fechaHoraDesde=self._format_fecha(fecha_desde),
+				fechaHoraHasta=self._format_fecha(fecha_hasta),
+				creacion=[]
+			)
+
+		facturas = self._get_invoices(fecha_desde, fecha_hasta)
+
+		return ContpaqAlbaranVentaCollection(
+			tabla="dbo.admDocumentos",
+			fechaHoraDesde=self._format_fecha(fecha_desde),
+			fechaHoraHasta=self._format_fecha(fecha_hasta),
+			creacion=facturas
+		)
+
+	def _get_fecha_hasta_invoices(self, fecha_desde):
+		"""Obtiene el máximo timestamp de facturas después de la fecha dada."""
+		try:
+			conn = self._get_connection()
+			cursor = conn.cursor()
+
+			query = """
+			SELECT TOP 1 admDocumentos.CTIMESTAMP
+			FROM admDocumentos
+			WHERE admDocumentos.CIDDOCUMENTODE = (
+				SELECT admDocumentosModelo.CIDDOCUMENTODE
+				FROM admDocumentosModelo
+				WHERE admDocumentosModelo.CDESCRIPCION = 'Factura'
+			)
+			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) > ?
+			ORDER BY CAST(admDocumentos.CTIMESTAMP AS DATETIME) DESC
+			"""
+
+			cursor.execute(query, (fecha_desde,))
+			result = cursor.fetchone()
+			cursor.close()
+			conn.close()
+
+			if result:
+				timestamp = result[0]
+				if isinstance(timestamp, str):
+					timestamp = timestamp.rsplit(':', 1)[0] + '.' + timestamp.rsplit(':', 1)[1]
+					return datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S.%f')
+				return timestamp
+			return fecha_desde
+		except Exception as e:
+			raise Exception(f"Error al obtener fecha hasta de facturas: {str(e)}")
+
+	def _get_invoices(self, fecha_desde, fecha_hasta):
+		"""Obtiene facturas de Contpaq en el rango indicado, incluyendo líneas."""
+		conn = None
+		cursor = None
+		try:
+			conn = self._get_connection()
+			cursor = conn.cursor()
+
+			query = """
+			SELECT CIDDOCUMENTO, CTIMESTAMP, CIDCLIENTEPROVEEDOR, CMETODOPAG, CTOTAL
+			FROM admDocumentos
+			WHERE admDocumentos.CIDDOCUMENTODE = (
+				SELECT admDocumentosModelo.CIDDOCUMENTODE
+				FROM admDocumentosModelo
+				WHERE admDocumentosModelo.CDESCRIPCION = 'Factura'
+			)
+			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) > ?
+			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) <= ?
+			ORDER BY CAST(admDocumentos.CTIMESTAMP AS DATETIME) DESC
+			"""
+
+			cursor.execute(query, (fecha_desde, fecha_hasta))
+			rows = cursor.fetchall()
+
+			facturas = []
+			for row in rows:
+				lineas = self._get_invoice_lines(conn, row[0])
+				facturas.append(
+					ContpaqAlbaranVentaAggregate(
+						CIDDOCUMENTO=row[0],
+						CTIMESTAMP=row[1],
+						CIDCLIENTEPROVEEDOR=row[2],
+						CMETODOPAG=row[3],
+						CTOTAL=row[4],
+						LINEAS=lineas,
+					)
+				)
+
+			return facturas
+		except Exception as e:
+			raise Exception(f"Error al obtener facturas de SQL Server: {str(e)}")
+		finally:
+			if cursor is not None:
+				cursor.close()
+			if conn is not None:
+				conn.close()
+
+	def _get_invoice_lines(self, conn, documento_id):
+		"""Obtiene las líneas de una factura de Contpaq."""
+		cursor = None
+		try:
+			cursor = conn.cursor()
+
+			query = """
+			SELECT CIDMOVIMIENTO, CIDDOCUMENTO, CNUMEROMOVIMIENTO, CIDPRODUCTO,
+			       CUNIDADES, CPRECIO, CTOTAL, CPORCENTAJEIMPUESTO1
+			FROM admMovimientos
+			WHERE admMovimientos.CIDDOCUMENTO = ?
+			ORDER BY CNUMEROMOVIMIENTO ASC
+			"""
+
+			cursor.execute(query, (documento_id,))
+			rows = cursor.fetchall()
+			return [
+				ContpaqAlbaranVentaLineaAggregate(
+					CIDMOVIMIENTO=row[0],
+					CIDDOCUMENTO=row[1],
+					CNUMEROMOVIMIENTO=row[2],
+					CIDPRODUCTO=row[3],
+					CUNIDADES=row[4],
+					CPRECIO=row[5],
+					CTOTAL=row[6],
+					CPORCENTAJEIMPUESTO1=row[7],
+				)
+				for row in rows
+			]
+		finally:
+			if cursor is not None:
+				cursor.close()
+
 	def getArticleByID(self, articulo_id):
 		"""
 		Obtiene un artículo de Contpaq por CIDPRODUCTO.
@@ -674,20 +833,12 @@ class SDKContpaqRepository:
 			cursor = conn.cursor()
 
 			query = """
-			SELECT
-				admMovimientos.CIDPRODUCTO,
-				SUM(
-					CASE
-						WHEN admMovimientos.CTIPOTRASPASO IN (1, 3) THEN admMovimientos.CUNIDADES
-						WHEN admMovimientos.CTIPOTRASPASO = 2       THEN -admMovimientos.CUNIDADES
-						ELSE 0
-					END
-				) AS CUNIDADES_NETAS
-			FROM admMovimientos
-			WHERE admMovimientos.CIDPRODUCTO = ?
-			  AND admMovimientos.CAFECTADOINVENTARIO = 1
-			GROUP BY
-				admMovimientos.CIDPRODUCTO
+			select 
+			admCapasProducto.CIDPRODUCTO,
+			sum(admCapasProducto.CEXISTENCIA) as CUNIDADES_NETAS
+			from admCapasProducto
+			where admCapasProducto.CIDPRODUCTO = ?
+			group by admCapasProducto.CIDPRODUCTO
 			"""
 
 			cursor.execute(query, (articulo_logistica.ContpaqArticuloID,))
@@ -835,7 +986,7 @@ class SDKContpaqRepository:
 			sdk.fTerminaSDK()
 		finally:
 			os.chdir(cwd_original)
-			self._cerrar_sesion_contabilidad_com()
+			# self._cerrar_sesion_contabilidad_com()
 
 	def _leer_error_sdk(self, sdk, codigo_error):
 		"""Devuelve el mensaje de error en texto legible usando fError de la DLL."""

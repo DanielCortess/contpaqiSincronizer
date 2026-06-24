@@ -113,8 +113,15 @@ class SyncContpaqWindowsService(win32serviceutil.ServiceFramework):
 
             controller = SyncContpaqController(config)
             controller.run(stop_event=self.stop_event)
+            if not self.stop_event.is_set():
+                servicemanager.LogErrorMsg("Sincronizador Contpaqi terminó inesperadamente sin señal de parada.")
+                # Forzar salida no limpia para que el SCM aplique políticas de recuperación.
+                os._exit(2)
         except Exception as ex:
             servicemanager.LogErrorMsg(f"Sincronizador Contpaqi crashed: {ex}")
+            if not self.stop_event.is_set():
+                # Si el servicio falla por excepción, salir con código no-cero para activar recovery de Windows.
+                os._exit(1)
             self.stop_event.set()
             win32event.SetEvent(self.h_wait_stop)
 

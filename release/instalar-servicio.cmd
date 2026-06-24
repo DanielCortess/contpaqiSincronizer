@@ -72,6 +72,8 @@ if not "%errorlevel%"=="0" (
 )
 
 sc description "%SERVICE_NAME%" "Sincroniza datos entre Netvy y Contpaqi." >nul
+sc failure "%SERVICE_NAME%" reset= 86400 actions= restart/5000/restart/15000/restart/60000 >nul
+sc failureflag "%SERVICE_NAME%" 1 >nul
 
 sc query "%SERVICE_NAME%" >nul 2>&1
 if not "%errorlevel%"=="0" (

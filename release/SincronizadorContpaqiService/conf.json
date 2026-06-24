@@ -1,42 +1,37 @@
 {
-    "GENERAL":{
+    "GENERAL": {
         "TIME": 3
     },
-    "NETVY":{
-        "URLBASE2":"localhost",
-        "USER2":"testPaisEmpresa1706@gmail.com",
-        "PASSWORD2":"ferWUk",
-        "LICENSE2":"NETVY-TEST-LOCAL",
-        "CODIGOFAMILIA2":"FAMGE",
-        "CODIGOMONEDA2":"MXN",
-        "URLBASE": "https://coapi.netvy.net",
-        "USER": "sincro@sincro.com",
-        "PASSWORD": "123",
-        "LICENSE": "8756b7af-4549-413b-b022-7c43d73e9c30",
+    "NETVY": {
+        "URLBASE": "https://netvy-api-dev.onyxsoft.co",
+        "USER": "tiyejo8131@donumart.com",
+        "PASSWORD": "zUjo7R",
+        "LICENSE": "NETVY-COMPAQI-SYNC",
         "CODIGOFAMILIA": "FAMGE",
         "CODIGOMONEDA": "MXN"
     },
-    "SQLLITE":{
-        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
-        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqi.db"
+    "SQLLITE": {
+        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
+        "DBPATH2": "./LocalDB/SQLLITESincronizadorContpaqi.db",
+        "BASEPATH": "C:\\ProgramData\\SincronizadorContpaqi"
     },
-    "SQLLITE_STOCK":{
-        "DBPATH":"C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
-        "DBPATH2":"./LocalDB/SQLLITESincronizadorContpaqiStock.db"
+    "SQLLITE_STOCK": {
+        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATH2": "./LocalDB/SQLLITESincronizadorContpaqiStock.db"
     },
-    "CONTPAQ":{
-        "PATH":"C:\\Program Files (x86)\\Compac\\COMERCIAL",
-        "USER":"SUPERVISOR",
-        "PASSWORD":"",
+    "CONTPAQ": {
+        "PATH": "C:\\Program Files (x86)\\Compac\\COMERCIAL",
+        "USER": "SUPERVISOR",
+        "PASSWORD": "",
         "CONTABILIDAD_USER":"SUPERVISOR",
         "CONTABILIDAD_PASSWORD":"",
-        "RUTAEMPRESA": "C:\\Compac\\Empresas\\adPRUEBAS",
-        "NOMBRE_PAQ":"CONTPAQ I COMERCIAL",
-        "DRIVER":"{SQL Server}",
-        "SERVER":"DESKTOP-HRHK2MO\\CONTPAQI",
-        "DATABASE":"adPRUEBAS",
-        "Trusted_Connection":"no",
-        "SQL_USER":"sa",
-        "SQL_PASSWORD":"CONTPAQI2026"
+        "RUTAEMPRESA": "C:\\Compac\\Empresas\\adBD",
+        "NOMBRE_PAQ": "CONTPAQ I COMERCIAL",
+        "DRIVER": "{SQL Server}",
+        "SERVER": "ONYX\\CONTPAQI",
+        "DATABASE": "adBD",
+        "Trusted_Connection": "no",
+        "SQL_USER": "sa",
+        "SQL_PASSWORD": "Contpaqi2026*"
     }
 }

@@ -3,6 +3,7 @@ import requests
 from APP import init
 from DOM.LoginToken import LoginToken
 from DOM.NetvyArticuloAggregate import NetvyArticuloAggregate
+from DOM.NetvyAlbaranVentaAggregate import NetvyAlbaranVentaAggregate
 from DOM.NetvyArticuloCollection import NetvyArticuloCollection
 from DOM.NetvyMailingAggregate import NetvyMailingAggregate
 from DOM.NetvyMailingCollection import NetvyMailingCollection
@@ -26,6 +27,8 @@ class ApiNetvyRepository:
 		self.license = config.get("LICENSE")
 		self.codigo_familia = config.get("CODIGOFAMILIA")
 		self.codigo_moneda = config.get("CODIGOMONEDA")
+		self.serie = config.get("SERIE", "")
+		self.almacen = config.get("ALMACEN", "")
 		# self.tipo_documento = config.get("TIPODOCUMENTO")
 		# self.tipo_persona_mex = config.get("TIPOPERSONAMEX")
 
@@ -682,6 +685,101 @@ class ApiNetvyRepository:
 
 		articulo.ArticuloID = articulo_id
 		return articulo_id
+
+	def createDeliveryNote(self, albaran):
+		"""Crea un albarán de venta en Netvy para después facturarlo."""
+		if albaran is None:
+			raise ValueError("albaran es obligatorio")
+
+		if not isinstance(albaran, NetvyAlbaranVentaAggregate):
+			raise ValueError("albaran debe ser una instancia de NetvyAlbaranVentaAggregate")
+
+		url = f"{self.url_base}/foodoz/sales/delivery-notes"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"Serie": albaran.Serie or "",
+			"FechaAlbaran": albaran.FechaAlbaran or "",
+			"Almacen": albaran.Almacen or "",
+			"FechaHoraCreacion": albaran.FechaHoraCreacion or "",
+			"ProyectoOFID": albaran.ProyectoOFID or "",
+			"ClienteFactura": albaran.ClienteFactura or {},
+			"FormaPago": albaran.FormaPago or [],
+			"Moneda": albaran.Moneda or "",
+			"Lineas": albaran.Lineas or [],
+		}
+
+		response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code not in (200, 201):
+			raise Exception(
+				f"Error al crear albarán en la API: {response.status_code} - {response.text}"
+			)
+
+		data = response.json()
+		if not data.get("success", False):
+			raise Exception(f"La API de Netvy rechazó la creación del albarán: {data}")
+
+		albaran_id = data.get("ID")
+		if albaran_id is None:
+			raise Exception("ID de albarán no encontrado en la respuesta de la API")
+
+		return albaran_id
+
+	def createInvoiceFromDeliveryNote(self, serie, albaran_id, tipo_pago, precio_total):
+		"""Genera una factura en Netvy a partir de un albarán existente."""
+		if albaran_id is None:
+			raise ValueError("albaran_id es obligatorio")
+
+		url = f"{self.url_base}/foodoz/sales/invoices"
+		headers = {
+			"Authorization": f"Bearer {init.token.token}",
+		}
+
+		body = {
+			"Serie": serie or "",
+			"PedidoID": "",
+			"ArrAlbaranes": [
+				{
+					"AlbaranID": albaran_id,
+					"FormasPago": [
+						{
+							"Tipo": str(tipo_pago or ""),
+							"Precio": precio_total if precio_total is not None else 0,
+						}
+					],
+				}
+			],
+		}
+
+		response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code == 401:
+			self.refresh_token(init.token)
+			headers["Authorization"] = f"Bearer {init.token.token}"
+			response = requests.post(url, json=body, headers=headers)
+
+		if response.status_code not in (200, 201):
+			raise Exception(
+				f"Error al crear factura en la API: {response.status_code} - {response.text}"
+			)
+
+		data = response.json()
+		if not data.get("success", False):
+			raise Exception(f"La API de Netvy rechazó la creación de la factura: {data}")
+
+		facturas_id = data.get("facturasID") or []
+		if not facturas_id:
+			raise Exception("facturasID no encontrado en la respuesta de la API")
+
+		return facturas_id[0]
 
 	def updateArticle(self, articulo):
 		"""

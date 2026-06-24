@@ -1,0 +1,17 @@
+class ContpaqAlbaranVentaAggregate:
+
+	def __init__(
+		self,
+		CIDDOCUMENTO,
+		CTIMESTAMP,
+		CIDCLIENTEPROVEEDOR,
+		CMETODOPAG,
+		CTOTAL,
+		LINEAS=None,
+	):
+		self.CIDDOCUMENTO = CIDDOCUMENTO
+		self.CTIMESTAMP = CTIMESTAMP
+		self.CIDCLIENTEPROVEEDOR = CIDCLIENTEPROVEEDOR
+		self.CMETODOPAG = CMETODOPAG
+		self.CTOTAL = CTOTAL
+		self.LINEAS = LINEAS if LINEAS is not None else []

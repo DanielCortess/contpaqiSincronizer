@@ -8,7 +8,9 @@
         "PASSWORD": "zUjo7R",
         "LICENSE": "NETVY-COMPAQI-SYNC",
         "CODIGOFAMILIA": "FAMGE",
-        "CODIGOMONEDA": "MXN"
+        "CODIGOMONEDA": "MXN",
+        "SERIE":"Sin",
+        "ALMACEN":"ALM"
     },
     "SQLLITE": {
         "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
@@ -25,13 +27,13 @@
         "PASSWORD": "",
         "CONTABILIDAD_USER":"SUPERVISOR",
         "CONTABILIDAD_PASSWORD":"",
-        "RUTAEMPRESA": "C:\\Compac\\Empresas\\adBD",
+        "RUTAEMPRESA": "C:\\Compac\\Empresas\\adPRUEBAS",
         "NOMBRE_PAQ": "CONTPAQ I COMERCIAL",
         "DRIVER": "{SQL Server}",
-        "SERVER": "ONYX\\CONTPAQI",
-        "DATABASE": "adBD",
+        "SERVER": "localhost\\CONTPAQI",
+        "DATABASE": "adPRUEBAS",
         "Trusted_Connection": "no",
         "SQL_USER": "sa",
-        "SQL_PASSWORD": "Contpaqi2026*"
+        "SQL_PASSWORD": "CONTPAQI2026"
     }
 }

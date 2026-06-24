@@ -78,6 +78,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Fallo la instalacion del servicio."
 }
 
+# Configurar recuperación automática ante fallos del proceso.
+& sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
+& sc.exe failureflag $ServiceName 1 | Out-Null
+
 # Asegurar permisos de escritura en la carpeta de datos para la cuenta del servicio (LocalSystem)
 $dataFolder = "C:\ProgramData\SincronizadorContpaqi"
 if (-not (Test-Path $dataFolder)) {
