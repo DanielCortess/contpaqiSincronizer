@@ -782,6 +782,8 @@ class SyncContpaqController:
 					"Precio": self._to_string_safe(linea.CPRECIO),
 					"IVA": self._resolver_iva_netvy(linea.CPORCENTAJEIMPUESTO1),
 					"Importe": self._to_string_safe(linea.CTOTAL),
+					"Descuento1": self._to_string_safe(linea.CDESCUENTO1),
+					"Descuento2": self._to_string_safe(linea.CDESCUENTO2),
 				}
 			)
 
