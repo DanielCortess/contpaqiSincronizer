@@ -4,7 +4,7 @@ import pyodbc
 import time
 import win32com.client
 from ctypes import c_int, c_double, c_char, Structure, byref, create_string_buffer, WinDLL
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from DOM.ContpaqArticuloAggregate import ContpaqArticuloAggregate
 from DOM.ContpaqArticuloCollection import ContpaqArticuloCollection
 from DOM.ContpaqAlbaranVentaAggregate import ContpaqAlbaranVentaAggregate
@@ -211,6 +211,13 @@ class SDKContpaqRepository:
 
 		self.sdk_path = config.get("PATH")
 		self.sdk_user = config.get("USER", "SUPERVISOR")
+		self.minutos_desfase_factura = 10
+		general_config = config.get("GENERAL") or {}
+		if isinstance(general_config, dict):
+			try:
+				self.minutos_desfase_factura = max(0, int(general_config.get("MINUTOSDESFASEFACTURA", 10)))
+			except (TypeError, ValueError):
+				self.minutos_desfase_factura = 10
 		self.sdk_password = config.get("PASSWORD", "")
 		self.contabilidad_user = config.get("CONTABILIDAD_USER", "")
 		self.contabilidad_password = config.get("CONTABILIDAD_PASSWORD", "")
@@ -626,41 +633,38 @@ class SDKContpaqRepository:
 			creacion=facturas
 		)
 
-	def _get_fecha_hasta_invoices(self, fecha_desde):
-		"""Obtiene el máximo timestamp de facturas después de la fecha dada."""
-		try:
-			conn = self._get_connection()
-			cursor = conn.cursor()
+	def _calcular_fecha_hasta_facturas(self, fecha_desde, ahora=None):
+		"""Calcula la fecha hasta para la sincronización de facturas con desfase de 10 minutos.
 
-			query = """
-			SELECT TOP 1 admDocumentos.CTIMESTAMP
-			FROM admDocumentos
-			WHERE admDocumentos.CIDDOCUMENTODE = (
-				SELECT admDocumentosModelo.CIDDOCUMENTODE
-				FROM admDocumentosModelo
-				WHERE admDocumentosModelo.CDESCRIPCION = 'Factura'
-			)
-			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) > ?
-			ORDER BY CAST(admDocumentos.CTIMESTAMP AS DATETIME) DESC
-			"""
-
-			cursor.execute(query, (fecha_desde,))
-			result = cursor.fetchone()
-			cursor.close()
-			conn.close()
-
-			if result:
-				timestamp = result[0]
-				if isinstance(timestamp, str):
-					timestamp = timestamp.rsplit(':', 1)[0] + '.' + timestamp.rsplit(':', 1)[1]
-					return datetime.strptime(timestamp, '%m/%d/%Y %H:%M:%S.%f')
-				return timestamp
+		La sincronización de facturas no debe consultar datos muy recientes, porque
+		el usuario puede estar creando la cabecera y las líneas en ese mismo momento.
+		Por eso se aplica un desfase de 10 minutos. Si la fecha de inicio ya es mayor
+		que la fecha hasta calculada, se conserva la fecha desde para no retroceder.
+		"""
+		ahora = ahora or datetime.now()
+		minutos_desfase = getattr(self, "minutos_desfase_factura", 10)
+		fecha_hasta = ahora - timedelta(minutes=minutos_desfase)
+		if fecha_desde > fecha_hasta:
 			return fecha_desde
+		return fecha_hasta
+
+	def _get_fecha_hasta_invoices(self, fecha_desde):
+		"""Obtiene la fecha hasta para facturas con desfase de 10 minutos.
+		
+		Solo considera facturas que tengan al menos 1 movimiento, pero el límite
+		superior se toma del tiempo actual menos 10 minutos para evitar sincronizar
+		datos que aún podrían estar incompletos.
+		"""
+		try:
+			return self._calcular_fecha_hasta_facturas(fecha_desde)
 		except Exception as e:
 			raise Exception(f"Error al obtener fecha hasta de facturas: {str(e)}")
 
 	def _get_invoices(self, fecha_desde, fecha_hasta):
-		"""Obtiene facturas de Contpaq en el rango indicado, incluyendo líneas."""
+		"""Obtiene facturas de Contpaq en el rango indicado, incluyendo líneas.
+		
+		Solo devuelve facturas que tengan al menos 1 movimiento (línea).
+		"""
 		conn = None
 		cursor = None
 		try:
@@ -668,16 +672,21 @@ class SDKContpaqRepository:
 			cursor = conn.cursor()
 
 			query = """
-			SELECT CIDDOCUMENTO, CTIMESTAMP, CIDCLIENTEPROVEEDOR, CMETODOPAG, CTOTAL
-			FROM admDocumentos
-			WHERE admDocumentos.CIDDOCUMENTODE = (
-				SELECT admDocumentosModelo.CIDDOCUMENTODE
-				FROM admDocumentosModelo
-				WHERE admDocumentosModelo.CDESCRIPCION = 'Factura'
-			)
-			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) > ?
-			AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) <= ?
-			ORDER BY CAST(admDocumentos.CTIMESTAMP AS DATETIME) DESC
+			SELECT *
+			FROM (
+				SELECT DISTINCT admDocumentos.CIDDOCUMENTO, admDocumentos.CTIMESTAMP, 
+				       admDocumentos.CIDCLIENTEPROVEEDOR, admDocumentos.CMETODOPAG, admDocumentos.CTOTAL
+				FROM admMovimientos
+				INNER JOIN admDocumentos ON admMovimientos.CIDDOCUMENTO = admDocumentos.CIDDOCUMENTO
+				WHERE admDocumentos.CIDDOCUMENTODE = (
+					SELECT admDocumentosModelo.CIDDOCUMENTODE
+					FROM admDocumentosModelo
+					WHERE admDocumentosModelo.CDESCRIPCION = 'Factura'
+				)
+				AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) > ?
+				AND CAST(admDocumentos.CTIMESTAMP AS DATETIME) <= ?
+			) AS facturas_con_movimientos
+			ORDER BY CAST(facturas_con_movimientos.CTIMESTAMP AS DATETIME) DESC
 			"""
 
 			cursor.execute(query, (fecha_desde, fecha_hasta))
@@ -839,7 +848,9 @@ class SDKContpaqRepository:
 			admCapasProducto.CIDPRODUCTO,
 			sum(admCapasProducto.CEXISTENCIA) as CUNIDADES_NETAS
 			from admCapasProducto
+			inner join admAlmacenes on admCapasProducto.CIDALMACEN = admAlmacenes.CIDALMACEN
 			where admCapasProducto.CIDPRODUCTO = ?
+			and admAlmacenes.CCODIGOALMACEN != '999'
 			group by admCapasProducto.CIDPRODUCTO
 			"""
 

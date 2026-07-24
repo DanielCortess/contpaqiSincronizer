@@ -37,7 +37,7 @@ class SyncContpaqController:
 		self._sqllite       = SQLLiteRepository(config["SQLLITE"])
 		self._sqllite_stock = SQLLiteStockRepository(config["SQLLITE_STOCK"])
 		self._netvy         = ApiNetvyRepository(config["NETVY"])
-		self._contpaq       = SDKContpaqRepository(config["CONTPAQ"])
+		self._contpaq       = SDKContpaqRepository({**config.get("CONTPAQ", {}), "GENERAL": config.get("GENERAL", {})})
 
 		# Fechas de última sincronización (se cargan en init())
 		self.fecha_mailing_netvy                 = None
@@ -176,8 +176,9 @@ class SyncContpaqController:
 				if netvy_art.ArticuloID is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_netvy_id("Articulo", netvy_art.ArticuloID):
-					if netvy_art.ArticuloID not in articulos_actualizar_contpaq_ids:
-						articulos_actualizar_contpaq.append({"netvy": netvy_art, "contpaq_id": None})
+					contpaq_id = self._sqllite.get_contpaq_id_por_netvy_id("Articulo", netvy_art.ArticuloID)
+					if contpaq_id is not None and netvy_art.ArticuloID not in articulos_actualizar_contpaq_ids:
+						articulos_actualizar_contpaq.append({"netvy": netvy_art, "contpaq_id": contpaq_id})
 						articulos_actualizar_contpaq_ids.add(netvy_art.ArticuloID)
 					continue
 				try:
@@ -213,8 +214,9 @@ class SyncContpaqController:
 				if netvy_mail.MailingID is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_netvy_id("Mailing", netvy_mail.MailingID):
-					if netvy_mail.MailingID not in mailings_actualizar_contpaq_ids:
-						mailings_actualizar_contpaq.append({"netvy": netvy_mail, "contpaq_id": None})
+					contpaq_id = self._sqllite.get_contpaq_id_por_netvy_id("Mailing", netvy_mail.MailingID)
+					if contpaq_id is not None and netvy_mail.MailingID not in mailings_actualizar_contpaq_ids:
+						mailings_actualizar_contpaq.append({"netvy": netvy_mail, "contpaq_id": contpaq_id})
 						mailings_actualizar_contpaq_ids.add(netvy_mail.MailingID)
 					continue
 				try:
@@ -404,8 +406,9 @@ class SyncContpaqController:
 				if contpaq_art.CIDPRODUCTO is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_contpaq_id("Articulo", contpaq_art.CIDPRODUCTO):
-					if contpaq_art.CIDPRODUCTO not in articulos_actualizar_netvy_ids:
-						articulos_actualizar_netvy.append({"contpaq": contpaq_art, "netvy_id": None})
+					netvy_id = self._sqllite.get_netvy_id_por_contpaq_id("Articulo", contpaq_art.CIDPRODUCTO)
+					if netvy_id is not None and contpaq_art.CIDPRODUCTO not in articulos_actualizar_netvy_ids:
+						articulos_actualizar_netvy.append({"contpaq": contpaq_art, "netvy_id": netvy_id})
 						articulos_actualizar_netvy_ids.add(contpaq_art.CIDPRODUCTO)
 					continue
 				try:
@@ -432,8 +435,9 @@ class SyncContpaqController:
 				if contpaq_mail.CIDCLIENTEPROVEEDOR is None:
 					continue
 				if self._sqllite.existe_sincronizacion_por_contpaq_id("Mailing", contpaq_mail.CIDCLIENTEPROVEEDOR):
-					if contpaq_mail.CIDCLIENTEPROVEEDOR not in mailings_actualizar_netvy_ids:
-						mailings_actualizar_netvy.append({"contpaq": contpaq_mail, "netvy_id": None})
+					netvy_id = self._sqllite.get_netvy_id_por_contpaq_id("Mailing", contpaq_mail.CIDCLIENTEPROVEEDOR)
+					if netvy_id is not None and contpaq_mail.CIDCLIENTEPROVEEDOR not in mailings_actualizar_netvy_ids:
+						mailings_actualizar_netvy.append({"contpaq": contpaq_mail, "netvy_id": netvy_id})
 						mailings_actualizar_netvy_ids.add(contpaq_mail.CIDCLIENTEPROVEEDOR)
 					continue
 				try:
@@ -819,7 +823,10 @@ class SyncContpaqController:
 			contpaq_art = item.get("contpaq")
 			if not contpaq_art:
 				continue
-			key = (item.get("netvy_id"), contpaq_art.CIDPRODUCTO)
+			netvy_id = item.get("netvy_id")
+			if netvy_id is None:
+				netvy_id = self._sqllite.get_netvy_id_por_contpaq_id("Articulo", contpaq_art.CIDPRODUCTO)
+			key = (netvy_id, contpaq_art.CIDPRODUCTO)
 			art_net_map[key] = item
 
 		art_con_map = {}
@@ -827,7 +834,10 @@ class SyncContpaqController:
 			netvy_art = item.get("netvy")
 			if not netvy_art:
 				continue
-			key = (netvy_art.ArticuloID, item.get("contpaq_id"))
+			contpaq_id = item.get("contpaq_id")
+			if contpaq_id is None:
+				contpaq_id = self._sqllite.get_contpaq_id_por_netvy_id("Articulo", netvy_art.ArticuloID)
+			key = (netvy_art.ArticuloID, contpaq_id)
 			art_con_map[key] = item
 
 		for key in set(art_net_map.keys()) & set(art_con_map.keys()):
@@ -859,7 +869,10 @@ class SyncContpaqController:
 			contpaq_mail = item.get("contpaq")
 			if not contpaq_mail:
 				continue
-			key = (item.get("netvy_id"), contpaq_mail.CIDCLIENTEPROVEEDOR)
+			netvy_id = item.get("netvy_id")
+			if netvy_id is None:
+				netvy_id = self._sqllite.get_netvy_id_por_contpaq_id("Mailing", contpaq_mail.CIDCLIENTEPROVEEDOR)
+			key = (netvy_id, contpaq_mail.CIDCLIENTEPROVEEDOR)
 			mail_net_map[key] = item
 
 		mail_con_map = {}
@@ -867,7 +880,10 @@ class SyncContpaqController:
 			netvy_mail = item.get("netvy")
 			if not netvy_mail:
 				continue
-			key = (netvy_mail.MailingID, item.get("contpaq_id"))
+			contpaq_id = item.get("contpaq_id")
+			if contpaq_id is None:
+				contpaq_id = self._sqllite.get_contpaq_id_por_netvy_id("Mailing", netvy_mail.MailingID)
+			key = (netvy_mail.MailingID, contpaq_id)
 			mail_con_map[key] = item
 
 		for key in set(mail_net_map.keys()) & set(mail_con_map.keys()):
