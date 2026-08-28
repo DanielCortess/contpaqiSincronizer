@@ -29,11 +29,69 @@ class ApiNetvyRepository:
 		self.codigo_moneda = config.get("CODIGOMONEDA")
 		self.serie = config.get("SERIE", "")
 		self.almacen = config.get("ALMACEN", "")
+		self.iva_netvy, self.iva_netvy_invalidos = self._cargar_iva_netvy(config.get("IVANETVY"))
 		# self.tipo_documento = config.get("TIPODOCUMENTO")
 		# self.tipo_persona_mex = config.get("TIPOPERSONAMEX")
 
 		if not all([self.url_base, self.user, self.password, self.license]):
 			raise ValueError("config debe incluir las llaves URLBASE, USER, PASSWORD, LICENSE")
+
+	def _normalizar_porcentaje_iva(self, valor):
+		"""Lleva un porcentaje a una clave canónica ('16', '8.5', '0') o None si no es numérico."""
+		if valor is None:
+			return None
+		try:
+			numero = float(str(valor).strip().replace("%", "").replace(",", "."))
+		except (TypeError, ValueError):
+			return None
+		return f"{round(numero, 4):g}"
+
+	def _cargar_iva_netvy(self, valor):
+		"""Traduce NETVY.IVANETVY a una tabla porcentaje canónico -> IvaVentaID.
+
+		Args:
+			valor (dict): Diccionario del conf.json, por ejemplo {"16": "26"}.
+
+		Returns:
+			tuple: (tabla normalizada, lista de entradas descartadas para reportar).
+
+		Raises:
+			ValueError: Si la llave existe pero no es un diccionario.
+		"""
+		if valor is None:
+			return {}, []
+
+		if not isinstance(valor, dict):
+			raise ValueError(
+				"NETVY.IVANETVY debe ser un diccionario de porcentaje -> IvaVentaID, "
+				'por ejemplo {"16": "26"}'
+			)
+
+		tabla     = {}
+		invalidos = []
+		for porcentaje, iva_id in valor.items():
+			clave = self._normalizar_porcentaje_iva(porcentaje)
+			texto_id = "" if iva_id is None else str(iva_id).strip()
+			if clave is None or not texto_id:
+				invalidos.append(f"{porcentaje}: {iva_id}")
+				continue
+			tabla[clave] = texto_id
+
+		return tabla, invalidos
+
+	def resolver_iva_venta_id(self, porcentaje):
+		"""Devuelve el IvaVentaID de Netvy para un porcentaje de Contpaq.
+
+		Args:
+			porcentaje: Valor de CIMPUESTO1 del artículo en Contpaq.
+
+		Returns:
+			str | None: El id configurado, o None si no hay correspondencia.
+		"""
+		clave = self._normalizar_porcentaje_iva(porcentaje)
+		if clave is None:
+			return None
+		return self.iva_netvy.get(clave)
 
 	def login(self):
 		url = f"{self.url_base}/login"
@@ -128,6 +186,7 @@ class ApiNetvyRepository:
 			TipoArticuloID=data.get("TipoArticuloID"),
 			Codigo=data.get("Codigo"),
 			PrecioVenta=data.get("PrecioVenta"),
+			IvaVentaID=data.get("IvaVentaID"),
 			Observacion=data.get("Observacion"),
 			Descripcion=data.get("Descripcion"),
 			CodigoAlternativo=data.get("CodigoAlternativo"),
@@ -662,6 +721,11 @@ class ApiNetvyRepository:
 			"Descripcion": articulo.Descripcion or ""
 		}
 
+		# Solo se envía el IVA cuando el porcentaje de Contpaq está mapeado en
+		# NETVY.IVANETVY; si no, se deja que Netvy aplique su valor por defecto.
+		if articulo.IvaVentaID is not None:
+			body["IvaVentaID"] = articulo.IvaVentaID
+
 		response = requests.post(url, json=body, headers=headers)
 
 		if response.status_code == 401:
@@ -808,6 +872,9 @@ class ApiNetvyRepository:
 			"Nombre": articulo.Nombre or "",
 			"PrecioVenta": articulo.PrecioVenta if articulo.PrecioVenta is not None else 0,
 		}
+
+		if articulo.IvaVentaID is not None:
+			body["IvaVentaID"] = articulo.IvaVentaID
 
 		response = requests.patch(url, json=body, headers=headers)
 

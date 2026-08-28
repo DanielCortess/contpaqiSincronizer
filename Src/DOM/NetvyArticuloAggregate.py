@@ -14,6 +14,7 @@ class NetvyArticuloAggregate:
 		TipoArticuloID=None,
 		Codigo=None,
 		PrecioVenta=None,
+		IvaVentaID=None,
 		Observacion=None,
 		Descripcion=None,
 		CodigoAlternativo=None,
@@ -31,6 +32,7 @@ class NetvyArticuloAggregate:
 		self.TipoArticuloID = TipoArticuloID
 		self.Codigo = Codigo
 		self.PrecioVenta = PrecioVenta
+		self.IvaVentaID = IvaVentaID
 		self.Observacion = Observacion
 		self.Descripcion = Descripcion
 		self.CodigoAlternativo = CodigoAlternativo

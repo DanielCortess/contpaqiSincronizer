@@ -153,6 +153,12 @@ class SyncContpaqController:
 				f"Valores válidos: {', '.join(_SINCRONIZACIONES_DISPONIBLES)}"
 			)
 
+		for invalida in self._netvy.iva_netvy_invalidos:
+			self._log_error(
+				f"[Sync] Entrada inválida en NETVY.IVANETVY (se ignora): '{invalida}'. "
+				'Se espera porcentaje numérico e IvaVentaID no vacío, por ejemplo {"16": "26"}'
+			)
+
 		habilitadas    = [n for n in _SINCRONIZACIONES_DISPONIBLES if self._sync_habilitada(n)]
 		deshabilitadas = [n for n in _SINCRONIZACIONES_DISPONIBLES if not self._sync_habilitada(n)]
 		self._log_info(f"[Sync] Sincronizaciones habilitadas: {', '.join(habilitadas) or 'ninguna'}")
@@ -512,6 +518,7 @@ class SyncContpaqController:
 						Codigo=contpaq_art.CCODIGOPRODUCTO,
 						Nombre=contpaq_art.CNOMBREPRODUCTO,
 						PrecioVenta=contpaq_art.CPRECIO1,
+						IvaVentaID=self._netvy.resolver_iva_venta_id(contpaq_art.CIMPUESTO1),
 						Descripcion=contpaq_art.CNOMBREPRODUCTO,
 						Activo=True,
 					)
@@ -682,6 +689,22 @@ class SyncContpaqController:
 			and (contpaq_art.CNOMBREPRODUCTO or "") == (netvy_art.Nombre or "")
 			and float(contpaq_art.CPRECIO1 or 0) == float(netvy_art.PrecioVenta or 0)
 		)
+
+	def _son_equivalentes_articulos_netvy(self, contpaq_art, netvy_art):
+		"""Compara artículos en el sentido Contpaq -> Netvy, incluyendo el IVA.
+
+		El IVA solo se compara cuando hay mapeo en NETVY.IVANETVY y Netvy devolvió
+		el campo; de lo contrario se ignora, para no disparar actualizaciones
+		interminables por un dato que no se puede contrastar.
+		"""
+		if not self._son_equivalentes_articulos(contpaq_art, netvy_art):
+			return False
+
+		iva_contpaq = self._netvy.resolver_iva_venta_id(contpaq_art.CIMPUESTO1)
+		if iva_contpaq is None or netvy_art.IvaVentaID is None:
+			return True
+
+		return str(iva_contpaq) == str(netvy_art.IvaVentaID)
 
 	def _son_equivalentes_mailings(self, contpaq_mail, netvy_mail):
 		return (
@@ -1030,7 +1053,7 @@ class SyncContpaqController:
 
 				try:
 					netvy_art_actual = self._netvy.getArticleByID(netvy_id)
-					if self._son_equivalentes_articulos(contpaq_art, netvy_art_actual):
+					if self._son_equivalentes_articulos_netvy(contpaq_art, netvy_art_actual):
 						continue
 				except Exception as ex:
 					self._log_error(
@@ -1046,6 +1069,7 @@ class SyncContpaqController:
 						Codigo=contpaq_art.CCODIGOPRODUCTO,
 						Nombre=contpaq_art.CNOMBREPRODUCTO,
 						PrecioVenta=contpaq_art.CPRECIO1,
+						IvaVentaID=self._netvy.resolver_iva_venta_id(contpaq_art.CIMPUESTO1),
 					)
 					self._netvy.updateArticle(netvy_art)
 					fecha_sync = fecha_historico

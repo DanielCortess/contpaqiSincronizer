@@ -3,8 +3,7 @@
         "TIME": 3,
         "MINUTOSDESFASEFACTURA": 10,
         "SINCRONIZACIONES": [
-            "Articulos",
-            "Mailings"
+            "Articulos"
         ],
         "SINCRONIZACIONES2": [
             "Facturas",
@@ -23,7 +22,10 @@
         "CODIGOFAMILIA": "FAMGE",
         "CODIGOMONEDA": "MXN",
         "SERIE":"Sin",
-        "ALMACEN":"ALM"
+        "ALMACEN":"ALM",
+        "IVANETVY": {
+            "16": "26"
+        }
     },
     "SQLLITE": {
         "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDBJulio\\SQLLITESincronizadorContpaqi.db",
