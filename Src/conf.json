@@ -1,7 +1,19 @@
 {
     "GENERAL": {
         "TIME": 3,
-        "MINUTOSDESFASEFACTURA": 10
+        "MINUTOSDESFASEFACTURA": 10,
+        "SINCRONIZACIONES": [
+            "Articulos",
+            "Mailings"
+        ],
+        "SINCRONIZACIONES2": [
+            "Facturas",
+            "Articulos",
+            "Mailings",
+            "PedidoVentaCabeceras",
+            "PedidoVentaLinea",
+            "Stock"
+        ]
     },
     "NETVY": {
         "URLBASE": "https://netvy-api-dev.onyxsoft.co",

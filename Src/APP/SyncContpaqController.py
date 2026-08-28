@@ -1,6 +1,7 @@
 ﻿import time
 import threading
 import traceback
+import unicodedata
 from datetime import datetime
 import win32evtlog
 import win32evtlogutil
@@ -20,11 +21,39 @@ from DOM.NetvyMailingAggregate import NetvyMailingAggregate
 
 _APP_NAME = "SincronizadorContpaqi"
 
+# Sincronizaciones parametrizables desde GENERAL.SINCRONIZACIONES en conf.json.
+_SINCRONIZACIONES_DISPONIBLES = (
+	"Facturas",
+	"Articulos",
+	"Mailings",
+	"PedidoVentaCabeceras",
+	"PedidoVentaLinea",
+	"Stock",
+)
+
+# Se aceptan singular/plural y textos sin acentos para tolerar errores de captura.
+_ALIAS_SINCRONIZACIONES = {
+	"FACTURA":              "Facturas",
+	"FACTURAS":             "Facturas",
+	"ARTICULO":             "Articulos",
+	"ARTICULOS":            "Articulos",
+	"MAILING":              "Mailings",
+	"MAILINGS":             "Mailings",
+	"PEDIDOVENTACABECERA":  "PedidoVentaCabeceras",
+	"PEDIDOVENTACABECERAS": "PedidoVentaCabeceras",
+	"PEDIDOVENTALINEA":     "PedidoVentaLinea",
+	"PEDIDOVENTALINEAS":    "PedidoVentaLinea",
+	"STOCK":                "Stock",
+}
+
 
 class SyncContpaqController:
 
 	def __init__(self, config):
 		self._interval = config["GENERAL"]["TIME"]
+		self._sincronizaciones, self._sincronizaciones_invalidas = self._resolver_sincronizaciones(
+			config.get("GENERAL", {})
+		)
 		self._iteracion = 0
 		self._stock_sync_thread = None
 		self._stock_sync_lock = threading.Lock()
@@ -50,6 +79,52 @@ class SyncContpaqController:
 		self.fecha_pedido_venta_linea_contpaq    = None
 		self.fecha_factura_contpaq               = None
 
+	def _normalizar_nombre_sincronizacion(self, nombre):
+		"""Deja el nombre en mayúsculas, sin acentos, espacios ni guiones bajos."""
+		texto = unicodedata.normalize("NFKD", str(nombre))
+		texto = "".join(c for c in texto if not unicodedata.combining(c))
+		return texto.strip().upper().replace(" ", "").replace("_", "").replace("-", "")
+
+	def _resolver_sincronizaciones(self, general_config):
+		"""Traduce GENERAL.SINCRONIZACIONES en el conjunto de sincronizaciones activas.
+
+		Si la llave no existe se habilitan todas, para no alterar el comportamiento
+		de instalaciones que todavía no tienen el parámetro. Un arreglo vacío sí
+		deshabilita todo, porque es una decisión explícita del archivo.
+
+		Args:
+			general_config (dict): Sección GENERAL de conf.json.
+
+		Returns:
+			tuple: (set de nombres canónicos habilitados, lista de valores no reconocidos).
+
+		Raises:
+			ValueError: Si la llave existe pero no es un arreglo.
+		"""
+		valor = general_config.get("SINCRONIZACIONES") if isinstance(general_config, dict) else None
+		if valor is None:
+			return set(_SINCRONIZACIONES_DISPONIBLES), []
+
+		if not isinstance(valor, (list, tuple)):
+			raise ValueError(
+				"GENERAL.SINCRONIZACIONES debe ser un arreglo de textos. "
+				f"Valores válidos: {', '.join(_SINCRONIZACIONES_DISPONIBLES)}"
+			)
+
+		habilitadas = set()
+		invalidas   = []
+		for item in valor:
+			canonico = _ALIAS_SINCRONIZACIONES.get(self._normalizar_nombre_sincronizacion(item))
+			if canonico is None:
+				invalidas.append(str(item))
+				continue
+			habilitadas.add(canonico)
+
+		return habilitadas, invalidas
+
+	def _sync_habilitada(self, nombre):
+		return nombre in self._sincronizaciones
+
 	def init(self):
 		# 1. Cargar variables globales de Netvy (FamiliaID, MonedaID, token)
 		self._netvy.login()
@@ -69,6 +144,20 @@ class SyncContpaqController:
 		fechas = self._sqllite.get_fechas_sincronizacion()
 		for attr, valor in fechas.items():
 			setattr(self, attr, valor)
+
+		# 5. Reportar la parametrización de sincronizaciones (solo al arrancar,
+		# porque el ciclo se repite cada pocos segundos).
+		for invalida in self._sincronizaciones_invalidas:
+			self._log_error(
+				f"[Sync] Valor no reconocido en GENERAL.SINCRONIZACIONES: '{invalida}'. "
+				f"Valores válidos: {', '.join(_SINCRONIZACIONES_DISPONIBLES)}"
+			)
+
+		habilitadas    = [n for n in _SINCRONIZACIONES_DISPONIBLES if self._sync_habilitada(n)]
+		deshabilitadas = [n for n in _SINCRONIZACIONES_DISPONIBLES if not self._sync_habilitada(n)]
+		self._log_info(f"[Sync] Sincronizaciones habilitadas: {', '.join(habilitadas) or 'ninguna'}")
+		if deshabilitadas:
+			self._log_info(f"[Sync] Sincronizaciones deshabilitadas: {', '.join(deshabilitadas)}")
 
 	def run(self, stop_event=None):
 		try:
@@ -137,37 +226,41 @@ class SyncContpaqController:
 		pedidos_netvy   = None
 		lineas_netvy    = None
 
-		try:
-			self._log_info(f"[Netvy -> Contpaq] Buscando artículos desde fecha: {self.fecha_articulo_netvy}")
-			articulos_netvy = self._netvy.getArticles(self.fecha_articulo_netvy)
-			if articulos_netvy:
-				self._log_info(f"[Netvy -> Contpaq] Artículos fechaHoraHasta recibida: {articulos_netvy.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getArticles Netvy falló: {ex}")
+		if self._sync_habilitada("Articulos"):
+			try:
+				self._log_info(f"[Netvy -> Contpaq] Buscando artículos desde fecha: {self.fecha_articulo_netvy}")
+				articulos_netvy = self._netvy.getArticles(self.fecha_articulo_netvy)
+				if articulos_netvy:
+					self._log_info(f"[Netvy -> Contpaq] Artículos fechaHoraHasta recibida: {articulos_netvy.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getArticles Netvy falló: {ex}")
 
-		try:
-			self._log_info(f"[Netvy -> Contpaq] Buscando mailings desde fecha: {self.fecha_mailing_netvy}")
-			mailings_netvy = self._netvy.getMailings(self.fecha_mailing_netvy)
-			if mailings_netvy:
-				self._log_info(f"[Netvy -> Contpaq] Mailings fechaHoraHasta recibida: {mailings_netvy.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getMailings Netvy falló: {ex}")
+		if self._sync_habilitada("Mailings"):
+			try:
+				self._log_info(f"[Netvy -> Contpaq] Buscando mailings desde fecha: {self.fecha_mailing_netvy}")
+				mailings_netvy = self._netvy.getMailings(self.fecha_mailing_netvy)
+				if mailings_netvy:
+					self._log_info(f"[Netvy -> Contpaq] Mailings fechaHoraHasta recibida: {mailings_netvy.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getMailings Netvy falló: {ex}")
 
-		try:
-			self._log_info(f"[Netvy -> Contpaq] Buscando cabeceras de pedido desde fecha: {self.fecha_pedido_venta_cabecera_netvy}")
-			pedidos_netvy = self._netvy.getPedidoVentaCabecera(self.fecha_pedido_venta_cabecera_netvy)
-			if pedidos_netvy:
-				self._log_info(f"[Netvy -> Contpaq] Cabeceras fechaHoraHasta recibida: {pedidos_netvy.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getPedidoVentaCabecera Netvy falló: {ex}")
+		if self._sync_habilitada("PedidoVentaCabeceras"):
+			try:
+				self._log_info(f"[Netvy -> Contpaq] Buscando cabeceras de pedido desde fecha: {self.fecha_pedido_venta_cabecera_netvy}")
+				pedidos_netvy = self._netvy.getPedidoVentaCabecera(self.fecha_pedido_venta_cabecera_netvy)
+				if pedidos_netvy:
+					self._log_info(f"[Netvy -> Contpaq] Cabeceras fechaHoraHasta recibida: {pedidos_netvy.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getPedidoVentaCabecera Netvy falló: {ex}")
 
-		try:
-			self._log_info(f"[Netvy -> Contpaq] Buscando líneas de pedido desde fecha: {self.fecha_pedido_venta_linea_netvy}")
-			lineas_netvy = self._netvy.getSalesOrderLine(self.fecha_pedido_venta_linea_netvy)
-			if lineas_netvy:
-				self._log_info(f"[Netvy -> Contpaq] Líneas fechaHoraHasta recibida: {lineas_netvy.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getSalesOrderLine Netvy falló: {ex}")
+		if self._sync_habilitada("PedidoVentaLinea"):
+			try:
+				self._log_info(f"[Netvy -> Contpaq] Buscando líneas de pedido desde fecha: {self.fecha_pedido_venta_linea_netvy}")
+				lineas_netvy = self._netvy.getSalesOrderLine(self.fecha_pedido_venta_linea_netvy)
+				if lineas_netvy:
+					self._log_info(f"[Netvy -> Contpaq] Líneas fechaHoraHasta recibida: {lineas_netvy.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getSalesOrderLine Netvy falló: {ex}")
 
 		# 2. Crear artículos en Contpaq
 		self._log_info("[Netvy -> Contpaq] Procesando artículos")
@@ -376,29 +469,32 @@ class SyncContpaqController:
 		mailings_contpaq  = None
 		facturas_contpaq  = None
 
-		try:
-			self._log_info(f"[Contpaq -> Netvy] Buscando artículos desde fecha: {self.fecha_articulo_contpaq}")
-			articulos_contpaq = self._contpaq.getArticles(self.fecha_articulo_contpaq)
-			if articulos_contpaq:
-				self._log_info(f"[Contpaq -> Netvy] Artículos fechaHoraHasta recibida: {articulos_contpaq.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getArticles Contpaq falló: {ex}")
+		if self._sync_habilitada("Articulos"):
+			try:
+				self._log_info(f"[Contpaq -> Netvy] Buscando artículos desde fecha: {self.fecha_articulo_contpaq}")
+				articulos_contpaq = self._contpaq.getArticles(self.fecha_articulo_contpaq)
+				if articulos_contpaq:
+					self._log_info(f"[Contpaq -> Netvy] Artículos fechaHoraHasta recibida: {articulos_contpaq.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getArticles Contpaq falló: {ex}")
 
-		try:
-			self._log_info(f"[Contpaq -> Netvy] Buscando mailings desde fecha: {self.fecha_mailing_contpaq}")
-			mailings_contpaq = self._contpaq.getMailings(self.fecha_mailing_contpaq)
-			if mailings_contpaq:
-				self._log_info(f"[Contpaq -> Netvy] Mailings fechaHoraHasta recibida: {mailings_contpaq.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getMailings Contpaq falló: {ex}")
+		if self._sync_habilitada("Mailings"):
+			try:
+				self._log_info(f"[Contpaq -> Netvy] Buscando mailings desde fecha: {self.fecha_mailing_contpaq}")
+				mailings_contpaq = self._contpaq.getMailings(self.fecha_mailing_contpaq)
+				if mailings_contpaq:
+					self._log_info(f"[Contpaq -> Netvy] Mailings fechaHoraHasta recibida: {mailings_contpaq.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getMailings Contpaq falló: {ex}")
 
-		try:
-			self._log_info(f"[Contpaq -> Netvy] Buscando facturas desde fecha: {self.fecha_factura_contpaq}")
-			facturas_contpaq = self._contpaq.getInvoices(self.fecha_factura_contpaq)
-			if facturas_contpaq:
-				self._log_info(f"[Contpaq -> Netvy] Facturas fechaHoraHasta recibida: {facturas_contpaq.fechaHoraHasta}")
-		except Exception as ex:
-			self._log_error(f"getInvoices Contpaq falló: {ex}")
+		if self._sync_habilitada("Facturas"):
+			try:
+				self._log_info(f"[Contpaq -> Netvy] Buscando facturas desde fecha: {self.fecha_factura_contpaq}")
+				facturas_contpaq = self._contpaq.getInvoices(self.fecha_factura_contpaq)
+				if facturas_contpaq:
+					self._log_info(f"[Contpaq -> Netvy] Facturas fechaHoraHasta recibida: {facturas_contpaq.fechaHoraHasta}")
+			except Exception as ex:
+				self._log_error(f"getInvoices Contpaq falló: {ex}")
 
 		# 2. Crear artículos en Netvy
 		if articulos_contpaq:
@@ -522,7 +618,8 @@ class SyncContpaqController:
 			self._pending_sync_dates[("Factura", "Contpaq", "fecha_factura_contpaq")] = facturas_contpaq.fechaHoraHasta
 
 		# 5. Lanzar sincronización de stock logístico en hilo independiente
-		self._iniciar_hilo_stock_logistico()
+		if self._sync_habilitada("Stock"):
+			self._iniciar_hilo_stock_logistico()
 
 		self._log_info("[Contpaq -> Netvy] Fin de sincronización")
 
@@ -919,7 +1016,7 @@ class SyncContpaqController:
 	def syncNetvyUpdates(self):
 		self._log_info("[Contpaq -> Netvy] Inicio de actualización")
 		fecha_base = self.fecha_articulo_contpaq
-		if self._articulos_actualizar_netvy:
+		if self._sync_habilitada("Articulos") and self._articulos_actualizar_netvy:
 			for item in self._articulos_actualizar_netvy:
 				contpaq_art = item.get("contpaq")
 				netvy_id = item.get("netvy_id")
@@ -983,7 +1080,7 @@ class SyncContpaqController:
 					)
 
 		fecha_base_mail = self.fecha_mailing_contpaq
-		if self._mailings_actualizar_netvy:
+		if self._sync_habilitada("Mailings") and self._mailings_actualizar_netvy:
 			for item in self._mailings_actualizar_netvy:
 				contpaq_mail = item.get("contpaq")
 				netvy_id = item.get("netvy_id")
@@ -1051,7 +1148,7 @@ class SyncContpaqController:
 	def syncContpaqUpdates(self):
 		self._log_info("[Netvy -> Contpaq] Inicio de actualización")
 		fecha_base = self.fecha_articulo_netvy
-		if self._articulos_actualizar_contpaq:
+		if self._sync_habilitada("Articulos") and self._articulos_actualizar_contpaq:
 			for item in self._articulos_actualizar_contpaq:
 				netvy_art = item.get("netvy")
 				contpaq_id = item.get("contpaq_id")
@@ -1115,7 +1212,7 @@ class SyncContpaqController:
 					)
 
 		fecha_base_mail = self.fecha_mailing_netvy
-		if self._mailings_actualizar_contpaq:
+		if self._sync_habilitada("Mailings") and self._mailings_actualizar_contpaq:
 			for item in self._mailings_actualizar_contpaq:
 				netvy_mail = item.get("netvy")
 				contpaq_id = item.get("contpaq_id")

@@ -1,30 +1,35 @@
 {
     "GENERAL": {
-        "TIME": 3
+        "TIME": 3,
+        "MINUTOSDESFASEFACTURA": 10
     },
     "NETVY": {
         "URLBASE": "https://netvy-api-dev.onyxsoft.co",
-        "USER": "tiyejo8131@donumart.com",
-        "PASSWORD": "zUjo7R",
+        "USER": "nifow80567@cadebek.com",
+        "PASSWORD": "gyTYNu",
         "LICENSE": "NETVY-COMPAQI-SYNC",
         "CODIGOFAMILIA": "FAMGE",
-        "CODIGOMONEDA": "MXN"
+        "CODIGOMONEDA": "MXN",
+        "SERIE":"Sin",
+        "ALMACEN":"ALM"
     },
     "SQLLITE": {
-        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
+        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDBJulio\\SQLLITESincronizadorContpaqi.db",
+        "DBPATHREAL": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqi.db",
         "DBPATH2": "./LocalDB/SQLLITESincronizadorContpaqi.db",
         "BASEPATH": "C:\\ProgramData\\SincronizadorContpaqi"
     },
     "SQLLITE_STOCK": {
-        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATH": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDBJulio\\SQLLITESincronizadorContpaqiStock.db",
+        "DBPATHREAL": "C:\\ProgramData\\SincronizadorContpaqi\\LocalDB\\SQLLITESincronizadorContpaqiStock.db",
         "DBPATH2": "./LocalDB/SQLLITESincronizadorContpaqiStock.db"
     },
     "CONTPAQ": {
         "PATH": "C:\\Program Files (x86)\\Compac\\COMERCIAL",
         "USER": "SUPERVISOR",
         "PASSWORD": "",
-        "CONTABILIDAD_USER":"SUPERVISOR",
-        "CONTABILIDAD_PASSWORD":"",
+        "CONTABILIDAD_USER": "SUPERVISOR",
+        "CONTABILIDAD_PASSWORD": "",
         "RUTAEMPRESA": "C:\\Compac\\Empresas\\adBD",
         "NOMBRE_PAQ": "CONTPAQ I COMERCIAL",
         "DRIVER": "{SQL Server}",
